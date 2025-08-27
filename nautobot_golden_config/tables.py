@@ -5,6 +5,7 @@ from django_tables2 import Column, LinkColumn, TemplateColumn
 from django_tables2.utils import A
 from nautobot.apps.tables import BaseTable, BooleanColumn, TagColumn, ToggleColumn
 from nautobot.extras.tables import StatusTableMixin
+from django.urls import reverse
 
 from nautobot_golden_config import models
 from nautobot_golden_config.utilities.constant import CONFIG_FEATURES, ENABLE_BACKUP, ENABLE_COMPLIANCE, ENABLE_INTENDED
@@ -547,4 +548,54 @@ class ConfigPlanTable(StatusTableMixin, BaseTable):
             "deploy_result",
             "config_set",
             "status",
+        )
+
+
+class ConfigMismatchGroupingTable(BaseTable):
+    """Table for displaying configuration mismatch grouping results."""
+
+    feature_name = Column(
+        verbose_name="Feature",
+        accessor="feature_name"
+    )
+    device_count = Column(
+        verbose_name="Device Count",
+        accessor="device_count"
+    )
+    config_snippet = TemplateColumn(
+        template_code="""
+        <details>
+            <summary>View Config</summary>
+            <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em;">{{ record.config_content|truncatechars:500 }}</pre>
+        </details>
+        """,
+        verbose_name="Configuration Snippet",
+        orderable=False
+    )
+    show_devices = TemplateColumn(
+        template_code="""
+        <a href="{% url 'dcim:device_list' %}?configcompliance__rule__feature={{ record.feature_id }}&configcompliance__actual_config_hash={{ record.config_hash }}" 
+           class="btn btn-sm btn-primary">
+            <i class="mdi mdi-eye"></i> Show Devices ({{ record.device_count }})
+        </a>
+        """,
+        verbose_name="Actions",
+        orderable=False
+    )
+
+    class Meta(BaseTable.Meta):
+        """Meta information for ConfigMismatchGroupingTable."""
+        
+        model = models.ConfigComplianceHash
+        fields = (
+            "feature_name",
+            "device_count", 
+            "config_snippet",
+            "show_devices",
+        )
+        default_columns = (
+            "feature_name",
+            "device_count",
+            "config_snippet", 
+            "show_devices",
         )

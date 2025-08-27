@@ -1,0 +1,85 @@
+{% extends 'generic/object_list.html' %}
+{% load buttons %}
+{% load static %}
+{% load helpers %}
+
+{% block title %}Configuration Mismatch Grouping Report{% endblock %}
+
+{% block breadcrumbs %}
+<li><a href="{% url 'plugins:nautobot_golden_config:configcompliance_mismatch_grouping' %}">Configuration Mismatch Grouping</a></li>
+{% block extra_breadcrumbs %}{% endblock extra_breadcrumbs %}
+{% endblock breadcrumbs %}
+
+{% block buttons %}
+<div class="btn-group">
+    <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <span class="mdi mdi-plus-thick" aria-hidden="true"></span> Execute <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu">
+        {% if compliance %}
+            <li><a href="{% url 'extras:job_run_by_class_path' class_path='nautobot_golden_config.jobs.ComplianceJob' %}">Compliance</a></li>
+        {% endif %}
+    </ul>
+</div>
+{% endblock %}
+
+{% block content_title %}
+<h1>Configuration Mismatch Grouping Report</h1>
+<p class="text-muted">
+    This report groups devices with identical non-compliant configurations by feature. 
+    Each group represents devices that have the exact same incorrect configuration for a specific compliance feature.
+</p>
+{% endblock content_title %}
+
+{% block table %}
+<div class="col-md-12">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">
+                <i class="mdi mdi-file-compare"></i>
+                Configuration Mismatch Groups
+                {% if table.rows %}
+                    <span class="badge">{{ table.rows|length }} group{{ table.rows|length|pluralize }}</span>
+                {% endif %}
+            </h3>
+        </div>
+        <div class="panel-body">
+            {% if table.rows %}
+                <div class="alert alert-info">
+                    <i class="mdi mdi-information"></i>
+                    <strong>Found {{ table.rows|length }} group{{ table.rows|length|pluralize }} of devices</strong> 
+                    with identical non-compliant configurations. Click "Show Devices" to view the devices in each group.
+                </div>
+                {% include 'utilities/obj_table.html' %}
+            {% else %}
+                <div class="alert alert-success text-center">
+                    <i class="mdi mdi-check-circle" style="font-size: 48px;"></i>
+                    <h4>Great news!</h4>
+                    <p>No configuration mismatch groups found. This means either:</p>
+                    <ul class="list-unstyled">
+                        <li>• All devices are compliant with their intended configurations</li>
+                        <li>• Each non-compliant device has a unique configuration issue</li>
+                        <li>• No compliance data has been generated yet</li>
+                    </ul>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% table_config_form table table_name="ObjectTable" %}
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script src="{% static 'js/tableconfig.js' %}"></script>
+<script>
+// Add vanilla JavaScript for config snippets
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-expand first few details elements for better UX
+    const details = document.querySelectorAll('details');
+    for (let i = 0; i < Math.min(3, details.length); i++) {
+        details[i].setAttribute('open', '');
+    }
+});
+</script>
+{% endblock %}

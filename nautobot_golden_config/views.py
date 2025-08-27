@@ -416,6 +416,54 @@ class ConfigComplianceOverview(generic.ObjectListView):
         return self.extra_content
 
 
+class ConfigMismatchGroupingView(generic.ObjectListView):
+    """View for configuration mismatch grouping report."""
+
+    action_buttons = ("export",)
+    filterset = filters.ConfigComplianceFilterSet
+    filterset_form = forms.ConfigComplianceFilterForm
+    table = tables.ConfigMismatchGroupingTable
+    template_name = "nautobot_golden_config/config_mismatch_grouping.html"
+
+    queryset = (
+        models.ConfigComplianceHash.objects.filter(
+            config_type="actual",
+            config_hash__isnull=False,
+            config_hash__gt="",
+            device__configcompliance__rule=F('rule'),
+            device__configcompliance__compliance=False
+        ).values(
+            'rule__feature__id',
+            'rule__feature__name', 
+            'rule__feature__slug',
+            'config_hash',
+            'config_content'
+        ).annotate(
+            device_count=Count('device', distinct=True),
+            feature_id=F('rule__feature__id'),
+            feature_name=F('rule__feature__name'),
+            feature_slug=F('rule__feature__slug')
+        ).filter(
+            device_count__gt=1  # Only show groups with more than 1 device
+        ).order_by('-device_count', 'rule__feature__name')
+    )
+
+    def setup(self, request, *args, **kwargs):
+        """Using request object to perform filtering based on query params."""
+        super().setup(request, *args, **kwargs)
+        # Apply user permissions to the base queryset
+        self.queryset = self.queryset.restrict(request.user, "view")
+
+    def get_context_data(self, **kwargs):
+        """Add extra context for the template."""
+        context = super().get_context_data(**kwargs)
+        context.update({
+            "title": "Configuration Mismatch Grouping Report",
+            "compliance": constant.ENABLE_COMPLIANCE,
+        })
+        return context
+
+
 class ComplianceFeatureUIViewSet(views.NautobotUIViewSet):
     """Views for the ComplianceFeature model."""
 

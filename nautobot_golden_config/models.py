@@ -1,5 +1,6 @@
 """Django Models for tracking the configuration compliance per feature and device."""
 
+import hashlib
 import json
 import logging
 import os
@@ -60,6 +61,27 @@ def _null_to_empty(val):
     if not val:
         return ""
     return val
+
+
+def _normalize_config_content(content):
+    """Normalize configuration content for consistent hashing."""
+    if not content:
+        return ""
+    
+    if isinstance(content, dict):
+        return json.dumps(content, sort_keys=True)
+    elif isinstance(content, list):
+        return json.dumps(content, sort_keys=True)
+    elif isinstance(content, str):
+        return content.strip()
+    else:
+        return str(content).strip()
+
+
+def _compute_config_hash(content):
+    """Compute SHA-256 hash of configuration content."""
+    normalized_content = _normalize_config_content(content)
+    return hashlib.sha256(normalized_content.encode('utf-8')).hexdigest()
 
 
 def _get_cli_compliance(obj):
@@ -365,6 +387,49 @@ class ComplianceRule(PrimaryModel):  # pylint: disable=too-many-ancestors
     "relationships",
     "webhooks",
 )
+class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
+    """Configuration compliance hash storage for grouping identical configurations."""
+
+    device = models.ForeignKey(to="dcim.Device", on_delete=models.CASCADE, help_text="The device")
+    rule = models.ForeignKey(to="ComplianceRule", on_delete=models.CASCADE, related_name="config_hashes")
+    config_type = models.CharField(
+        max_length=20,
+        choices=[("actual", "Actual"), ("intended", "Intended")],
+        help_text="Type of configuration (actual or intended)"
+    )
+    config_hash = models.CharField(
+        max_length=64,
+        help_text="SHA-256 hash of the configuration content",
+        db_index=True
+    )
+    config_content = models.JSONField(
+        blank=True, 
+        help_text="Configuration content for display purposes"
+    )
+
+    class Meta:
+        """Set unique together fields for model."""
+        ordering = ["device", "rule", "config_type"]
+        unique_together = ("device", "rule", "config_type")
+        indexes = [
+            models.Index(fields=["rule", "config_hash"]),
+            models.Index(fields=["rule", "config_type", "config_hash"]),
+        ]
+
+    def __str__(self):
+        """String representation of the hash record."""
+        return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash[:8]}"
+
+
+@extras_features(
+    "custom_fields",
+    "custom_links",
+    "custom_validators",
+    "export_templates",
+    "graphql",
+    "relationships",
+    "webhooks",
+)
 class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
     """Configuration compliance details."""
 
@@ -380,6 +445,9 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
     ordered = models.BooleanField(default=False)
     # Used for django-pivot, both compliance and compliance_int should be set.
     compliance_int = models.IntegerField(blank=True)
+    # Hash fields for grouping identical configurations
+    actual_config_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    intended_config_hash = models.CharField(max_length=64, blank=True, db_index=True)
 
     def to_objectchange(self, action, *, related_object=None, object_data_extra=None, object_data_exclude=None):  # pylint: disable=arguments-differ
         """Remove actual and intended configuration from changelog."""
@@ -427,6 +495,37 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
         self.ordered = compliance_details["ordered"]
         self.missing = compliance_details["missing"]
         self.extra = compliance_details["extra"]
+        
+        # Compute and store configuration hashes
+        self.actual_config_hash = _compute_config_hash(self.actual)
+        self.intended_config_hash = _compute_config_hash(self.intended)
+        
+        # Update or create ConfigComplianceHash records for grouping
+        self._update_config_hashes()
+
+    def _update_config_hashes(self):
+        """Update or create ConfigComplianceHash records for actual and intended configs."""
+        # Update or create hash record for actual config
+        ConfigComplianceHash.objects.update_or_create(
+            device=self.device,
+            rule=self.rule,
+            config_type="actual",
+            defaults={
+                "config_hash": self.actual_config_hash,
+                "config_content": self.actual,
+            }
+        )
+        
+        # Update or create hash record for intended config
+        ConfigComplianceHash.objects.update_or_create(
+            device=self.device,
+            rule=self.rule,
+            config_type="intended",
+            defaults={
+                "config_hash": self.intended_config_hash,
+                "config_content": self.intended,
+            }
+        )
 
     def remediation_on_save(self):
         """The actual remediation happens here, before saving the object."""
@@ -455,7 +554,8 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
         # in behavior
         if kwargs.get("update_fields"):
             kwargs["update_fields"].update(
-                {"compliance", "compliance_int", "ordered", "missing", "extra", "remediation"}
+                {"compliance", "compliance_int", "ordered", "missing", "extra", "remediation", 
+                 "actual_config_hash", "intended_config_hash"}
             )
 
         super().save(*args, **kwargs)

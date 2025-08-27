@@ -63,6 +63,15 @@ if ENABLE_COMPLIANCE:
         )
     )
 
+if ENABLE_COMPLIANCE:
+    items_operate.append(
+        NavMenuItem(
+            link="plugins:nautobot_golden_config:configcompliance_mismatch_grouping",
+            name="Mismatch Grouping Report",
+            permissions=["nautobot_golden_config.view_configcompliance"],
+        )
+    )
+
 if ENABLE_PLAN:
     items_operate.append(
         NavMenuItem(
