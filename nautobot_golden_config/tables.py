@@ -550,6 +550,8 @@ class ConfigPlanTable(StatusTableMixin, BaseTable):
             "status",
         )
 
+# Config Hash
+
 
 class ConfigMismatchGroupingTable(BaseTable):
     """Table for displaying configuration mismatch grouping results."""
@@ -571,14 +573,19 @@ class ConfigMismatchGroupingTable(BaseTable):
     )
     config_snippet = TemplateColumn(
         template_code="""
-        <details>
-            <summary>View Config</summary>
-            {% if record.config_content and record.config_content != '{}' and record.config_content != '[]' and record.config_content != '' %}
-                <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px;">{{ record.config_content|truncatechars:500 }}</pre>
-            {% else %}
-                <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; text-align: center; color: #6c757d;">--</pre>
-            {% endif %}
-        </details>
+        <div style="width: 300px;">
+            <div class="config-toggle" style="cursor: pointer; padding: 8px 0;">
+                <span>View Config</span>
+                <i class="mdi mdi-chevron-down config-chevron" style="margin-left: 5px; display: inline-block;"></i>
+            </div>
+            <div class="config-content" style="display: none;">
+                {% if record.config_content %}
+                    <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; margin: 0; white-space: pre-wrap;">{{ record.config_content|truncatechars:500 }}</pre>
+                {% else %}
+                    <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; text-align: center; color: #6c757d; margin: 0;">--</pre>
+                {% endif %}
+            </div>
+        </div>
         """,
         verbose_name="Configuration Snippet",
         orderable=False

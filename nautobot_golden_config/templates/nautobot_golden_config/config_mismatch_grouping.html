@@ -10,19 +10,6 @@
 {% block extra_breadcrumbs %}{% endblock extra_breadcrumbs %}
 {% endblock breadcrumbs %}
 
-{% block buttons %}
-<div class="btn-group">
-    <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-        <span class="mdi mdi-plus-thick" aria-hidden="true"></span> Execute <span class="caret"></span>
-    </button>
-    <ul class="dropdown-menu">
-        {% if compliance %}
-            <li><a href="{% url 'extras:job_run_by_class_path' class_path='nautobot_golden_config.jobs.ComplianceJob' %}">Compliance</a></li>
-        {% endif %}
-    </ul>
-</div>
-{% endblock %}
-
 {% block content_title %}
 <h1>Configuration Mismatch Grouping Report</h1>
 <p class="text-muted">
@@ -36,20 +23,15 @@
     <div class="panel panel-default">
         <div class="panel-heading">
             <h3 class="panel-title">
-                <i class="mdi mdi-file-compare"></i>
+                <i class="mdi mdi-file-compare" style="color: #007bff;"></i>
                 Configuration Mismatch Groups
                 {% if table.rows %}
-                    <span class="badge">{{ table.rows|length }} group{{ table.rows|length|pluralize }}</span>
+                    <span class="badge pull-right" style="background-color: #007bff; color: white;">{{ table.rows|length }} group{{ table.rows|length|pluralize }}</span>
                 {% endif %}
             </h3>
         </div>
         <div class="panel-body">
             {% if table.rows %}
-                <div class="alert alert-info">
-                    <i class="mdi mdi-information"></i>
-                    <strong>Found {{ table.rows|length }} group{{ table.rows|length|pluralize }} of devices</strong> 
-                    with identical non-compliant configurations. Click "Show Devices" to view the devices in each group.
-                </div>
                 {% include 'utilities/obj_table.html' %}
             {% else %}
                 <div class="alert alert-success text-center">
@@ -72,16 +54,46 @@
 {% block javascript %}
 {{ block.super }}
 <script src="{% static 'js/tableconfig.js' %}"></script>
+<style>
+.config-chevron {
+    transition: transform 0.3s ease !important;
+    display: inline-block !important;
+}
+</style>
 <script>
 var nautobot_csrf_token = "{{ csrf_token }}";
 
 // Add vanilla JavaScript for config snippets
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-expand first few details elements for better UX
-    const details = document.querySelectorAll('details');
-    for (let i = 0; i < Math.min(3, details.length); i++) {
-        details[i].setAttribute('open', '');
+    // Handle config toggle clicks with direct event listeners
+    function setupToggle(toggle) {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const content = this.nextElementSibling;
+            const chevron = this.querySelector('i.config-chevron');
+            
+            if (chevron && content) {
+                const isHidden = content.style.display === 'none';
+                content.style.display = isHidden ? 'block' : 'none';
+                chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+            }
+        });
     }
+    
+    // Set up all toggles
+    const toggles = document.querySelectorAll('.config-toggle');
+    
+    toggles.forEach(function(toggle) {
+        setupToggle(toggle);
+        
+        // Auto-expand all config snippets for better UX
+        const content = toggle.nextElementSibling;
+        const chevron = toggle.querySelector('i.config-chevron');
+        if (content && chevron) {
+            content.style.display = 'block';
+            chevron.style.transform = 'rotate(180deg)';
+        }
+    });
 });
 
 // Function to count config plans generated for this specific job
