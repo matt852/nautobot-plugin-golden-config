@@ -399,6 +399,7 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
     )
     config_hash = models.CharField(
         max_length=64,
+        blank=True,
         help_text="SHA-256 hash of the configuration content",
         db_index=True
     )

@@ -146,6 +146,20 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         to_field_name="slug",
         label="ComplianceFeature (slug)",
     )
+    actual_config_hash = django_filters.CharFilter(
+        field_name="actual_config_hash",
+        lookup_expr="exact",
+        label="Actual Config Hash",
+    )
+    intended_config_hash = django_filters.CharFilter(
+        field_name="intended_config_hash", 
+        lookup_expr="exact",
+        label="Intended Config Hash",
+    )
+    compliance = django_filters.BooleanFilter(
+        field_name="compliance",
+        label="Compliance Status",
+    )
 
     class Meta:
         """Meta class attributes for ConfigComplianceFilter."""

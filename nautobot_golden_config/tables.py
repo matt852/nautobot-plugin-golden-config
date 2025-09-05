@@ -558,28 +558,29 @@ class ConfigMismatchGroupingTable(BaseTable):
         verbose_name="Feature",
         accessor="feature_name"
     )
-    device_count = Column(
+    device_count = TemplateColumn(
+        template_code="""
+        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_list' %}?feature_id={{ record.feature_id }}&actual_config_hash={{ record.config_hash }}&compliance=false" 
+           class="text-primary" style="text-decoration: none; font-weight: bold;">
+            {{ record.device_count }} device{{ record.device_count|pluralize }}
+        </a>
+        """,
         verbose_name="Device Count",
-        accessor="device_count"
+        orderable=True,
+        order_by=("device_count",)
     )
     config_snippet = TemplateColumn(
         template_code="""
         <details>
             <summary>View Config</summary>
-            <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em;">{{ record.config_content|truncatechars:500 }}</pre>
+            {% if record.config_content and record.config_content != '{}' and record.config_content != '[]' and record.config_content != '' %}
+                <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px;">{{ record.config_content|truncatechars:500 }}</pre>
+            {% else %}
+                <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; text-align: center; color: #6c757d;">--</pre>
+            {% endif %}
         </details>
         """,
         verbose_name="Configuration Snippet",
-        orderable=False
-    )
-    show_devices = TemplateColumn(
-        template_code="""
-        <a href="{% url 'dcim:device_list' %}?configcompliance__rule__feature={{ record.feature_id }}&configcompliance__actual_config_hash={{ record.config_hash }}" 
-           class="btn btn-sm btn-primary">
-            <i class="mdi mdi-eye"></i> Show Devices ({{ record.device_count }})
-        </a>
-        """,
-        verbose_name="Actions",
         orderable=False
     )
 
@@ -591,11 +592,9 @@ class ConfigMismatchGroupingTable(BaseTable):
             "feature_name",
             "device_count", 
             "config_snippet",
-            "show_devices",
         )
         default_columns = (
             "feature_name",
             "device_count",
             "config_snippet", 
-            "show_devices",
         )

@@ -428,8 +428,6 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
     queryset = (
         models.ConfigComplianceHash.objects.filter(
             config_type="actual",
-            config_hash__isnull=False,
-            config_hash__gt="",
             device__configcompliance__rule=F('rule'),
             device__configcompliance__compliance=False
         ).values(
