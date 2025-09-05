@@ -583,6 +583,15 @@ class ConfigMismatchGroupingTable(BaseTable):
         verbose_name="Configuration Snippet",
         orderable=False
     )
+    actions = TemplateColumn(
+        template_code="""
+        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_remediate' %}?feature_id={{ record.feature_id }}&config_hash={{ record.config_hash }}">
+            <i class="mdi mdi-map-check-outline" title="Generate Remediation Config Plans"></i>
+        </a>
+        """,
+        verbose_name="Actions",
+        orderable=False
+    )
 
     class Meta(BaseTable.Meta):
         """Meta information for ConfigMismatchGroupingTable."""
@@ -592,9 +601,11 @@ class ConfigMismatchGroupingTable(BaseTable):
             "feature_name",
             "device_count", 
             "config_snippet",
+            "actions",
         )
         default_columns = (
             "feature_name",
             "device_count",
             "config_snippet", 
+            "actions",
         )
