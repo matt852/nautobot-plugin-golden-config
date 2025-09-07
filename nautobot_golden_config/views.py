@@ -420,8 +420,8 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
     """View for configuration mismatch grouping report."""
 
     action_buttons = ("export",)
-    filterset = filters.ConfigComplianceFilterSet
-    filterset_form = forms.ConfigComplianceFilterForm
+    filterset = filters.ConfigMismatchGroupingFilterSet
+    filterset_form = forms.ConfigMismatchFilterForm
     table = tables.ConfigComplianceHashTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
 
@@ -668,6 +668,19 @@ class ConfigPlanBulkDeploy(ObjectPermissionRequiredMixin, View):
         return redirect(job_result.get_absolute_url())
 
 
+class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
+    """View to generate the intended configuration."""
+
+    template_name = "nautobot_golden_config/generate_intended_config.html"
+    permission_required = ["dcim.view_device", "extras.view_gitrepository"]
+
+    def get_context_data(self, **kwargs):
+        """Get the context data for the view."""
+        context = super().get_context_data(**kwargs)
+        context["form"] = forms.GenerateIntendedConfigForm()
+        return context
+
+
 class RemediateMismatchGroupView(PermissionRequiredMixin, View):
     """View to remediate a mismatch group by running GenerateConfigPlans job."""
 
@@ -716,7 +729,7 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
             # Get the GenerateConfigPlans job
             job = Job.objects.get(name="Generate Config Plans")
 
-            # Enqueue the job without serialize_data to avoid KeyError
+            # Enqueue the job
             job_result = JobResult.enqueue_job(
                 job,
                 request.user,
@@ -731,16 +744,3 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
         except (Job.DoesNotExist, ValueError, TypeError, RuntimeError) as e:
             messages.error(request, f"Error starting remediation job: {str(e)}")
             return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
-
-
-class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
-    """View to generate the intended configuration."""
-
-    template_name = "nautobot_golden_config/generate_intended_config.html"
-    permission_required = ["dcim.view_device", "extras.view_gitrepository"]
-
-    def get_context_data(self, **kwargs):
-        """Get the context data for the view."""
-        context = super().get_context_data(**kwargs)
-        context["form"] = forms.GenerateIntendedConfigForm()
-        return context

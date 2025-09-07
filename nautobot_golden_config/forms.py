@@ -640,3 +640,21 @@ class GenerateIntendedConfigForm(django_forms.Form):
         super().__init__(*args, **kwargs)
         if version.parse(settings.VERSION) < version.parse("2.4.2"):
             self.fields["git_repository_branch"].widget = django_forms.HiddenInput
+
+
+class ConfigMismatchFilterForm(django_forms.Form):
+    """Filter Form for Config Mismatch."""
+
+    model = models.ConfigComplianceHash
+    field_order = [
+        "q",
+        "location_id",
+        "location",
+        "role",
+        "manufacturer",
+        "platform",
+        "device_status",
+        "device_type",
+        "device",
+    ]
+    q = django_forms.CharField(required=False, label="Search")
