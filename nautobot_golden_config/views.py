@@ -437,7 +437,7 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
             feature_slug=F("rule__feature__slug"),
         )
         .filter(
-            device_count__gt=1  # Only show groups with more than 1 device
+            device_count__gt=1
         )
         .order_by("-device_count", "rule__feature__name")
     )
@@ -657,12 +657,13 @@ class ConfigPlanBulkDeploy(ObjectPermissionRequiredMixin, View):
             return redirect("plugins:nautobot_golden_config:configplan_list")
 
         job_data = {"config_plan": config_plan_pks}
-        job = Job.objects.get(name="Deploy Config Plans")
+        job = Job.objects.get(name="Generate Config Plans")
 
         job_result = JobResult.enqueue_job(
             job,
             request.user,
             data=job_data,
+            **job.job_class.serialize_data(request),
         )
         return redirect(job_result.get_absolute_url())
 
@@ -711,9 +712,6 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
             if not device_ids:
                 messages.warning(request, "No devices found for this mismatch group.")
                 return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
-
-            # Get Device objects for the job filter
-            # devices = Device.objects.filter(id__in=device_ids)
 
             # Get the GenerateConfigPlans job
             job = Job.objects.get(name="Generate Config Plans")
