@@ -67,21 +67,23 @@ def _normalize_config_content(content):
     """Normalize configuration content for consistent hashing."""
     if not content:
         return ""
-    
+
     if isinstance(content, dict):
         return json.dumps(content, sort_keys=True)
-    elif isinstance(content, list):
+
+    if isinstance(content, list):
         return json.dumps(content, sort_keys=True)
-    elif isinstance(content, str):
+
+    if isinstance(content, str):
         return content.strip()
-    else:
-        return str(content).strip()
+
+    return str(content).strip()
 
 
 def _compute_config_hash(content):
     """Compute SHA-256 hash of configuration content."""
     normalized_content = _normalize_config_content(content)
-    return hashlib.sha256(normalized_content.encode('utf-8')).hexdigest()
+    return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
 
 
 def _get_cli_compliance(obj):
@@ -395,21 +397,16 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
     config_type = models.CharField(
         max_length=20,
         choices=[("actual", "Actual"), ("intended", "Intended")],
-        help_text="Type of configuration (actual or intended)"
+        help_text="Type of configuration (actual or intended)",
     )
     config_hash = models.CharField(
-        max_length=64,
-        blank=True,
-        help_text="SHA-256 hash of the configuration content",
-        db_index=True
+        max_length=64, blank=True, help_text="SHA-256 hash of the configuration content", db_index=True
     )
-    config_content = models.JSONField(
-        blank=True, 
-        help_text="Configuration content for display purposes"
-    )
+    config_content = models.JSONField(blank=True, help_text="Configuration content for display purposes")
 
     class Meta:
         """Set unique together fields for model."""
+
         ordering = ["device", "rule", "config_type"]
         unique_together = ("device", "rule", "config_type")
         indexes = [
@@ -431,7 +428,7 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
     "relationships",
     "webhooks",
 )
-class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
+class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too-many-instance-attributes
     """Configuration compliance details."""
 
     device = models.ForeignKey(to="dcim.Device", on_delete=models.CASCADE, help_text="The device")
@@ -496,11 +493,11 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
         self.ordered = compliance_details["ordered"]
         self.missing = compliance_details["missing"]
         self.extra = compliance_details["extra"]
-        
+
         # Compute and store configuration hashes
         self.actual_config_hash = _compute_config_hash(self.actual)
         self.intended_config_hash = _compute_config_hash(self.intended)
-        
+
         # Update or create ConfigComplianceHash records for grouping
         self._update_config_hashes()
 
@@ -514,9 +511,9 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
             defaults={
                 "config_hash": self.actual_config_hash,
                 "config_content": self.actual,
-            }
+            },
         )
-        
+
         # Update or create hash record for intended config
         ConfigComplianceHash.objects.update_or_create(
             device=self.device,
@@ -525,7 +522,7 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
             defaults={
                 "config_hash": self.intended_config_hash,
                 "config_content": self.intended,
-            }
+            },
         )
 
     def remediation_on_save(self):
@@ -555,8 +552,16 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors
         # in behavior
         if kwargs.get("update_fields"):
             kwargs["update_fields"].update(
-                {"compliance", "compliance_int", "ordered", "missing", "extra", "remediation", 
-                 "actual_config_hash", "intended_config_hash"}
+                {
+                    "compliance",
+                    "compliance_int",
+                    "ordered",
+                    "missing",
+                    "extra",
+                    "remediation",
+                    "actual_config_hash",
+                    "intended_config_hash",
+                }
             )
 
         super().save(*args, **kwargs)

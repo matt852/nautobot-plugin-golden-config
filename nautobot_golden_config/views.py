@@ -416,34 +416,30 @@ class ConfigComplianceOverview(generic.ObjectListView):
         return self.extra_content
 
 
-class ConfigMismatchGroupingView(generic.ObjectListView):
+class ConfigMismatchGroupingView(PermissionRequiredMixin, TemplateView):  # generic.ObjectListView):
     """View for configuration mismatch grouping report."""
 
     action_buttons = ("export",)
     filterset = filters.ConfigComplianceFilterSet
     filterset_form = forms.ConfigComplianceFilterForm
-    table = tables.ConfigMismatchGroupingTable
+    table = tables.ConfigComplianceHashTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
 
     queryset = (
         models.ConfigComplianceHash.objects.filter(
-            config_type="actual",
-            device__configcompliance__rule=F('rule'),
-            device__configcompliance__compliance=False
-        ).values(
-            'rule__feature__id',
-            'rule__feature__name', 
-            'rule__feature__slug',
-            'config_hash',
-            'config_content'
-        ).annotate(
-            device_count=Count('device', distinct=True),
-            feature_id=F('rule__feature__id'),
-            feature_name=F('rule__feature__name'),
-            feature_slug=F('rule__feature__slug')
-        ).filter(
+            config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
+        )
+        .values("rule__feature__id", "rule__feature__name", "rule__feature__slug", "config_hash", "config_content")
+        .annotate(
+            device_count=Count("device", distinct=True),
+            feature_id=F("rule__feature__id"),
+            feature_name=F("rule__feature__name"),
+            feature_slug=F("rule__feature__slug"),
+        )
+        .filter(
             device_count__gt=1  # Only show groups with more than 1 device
-        ).order_by('-device_count', 'rule__feature__name')
+        )
+        .order_by("-device_count", "rule__feature__name")
     )
 
     def setup(self, request, *args, **kwargs):
@@ -455,12 +451,18 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
     def get_context_data(self, **kwargs):
         """Add extra context for the template."""
         context = super().get_context_data(**kwargs)
-        context.update({
-            "title": "Configuration Mismatch Grouping Report",
-            "compliance": constant.ENABLE_COMPLIANCE,
-        })
+        context.update(
+            {
+                "title": "Configuration Mismatch Grouping Report",
+                "compliance": constant.ENABLE_COMPLIANCE,
+            }
+        )
         return context
 
+    @classmethod
+    def get_queryset(cls):
+        """Return the queryset for the view."""
+        return cls.queryset
 
 class ComplianceFeatureUIViewSet(views.NautobotUIViewSet):
     """Views for the ComplianceFeature model."""
@@ -677,54 +679,55 @@ class ConfigPlanBulkDeploy(ObjectPermissionRequiredMixin, View):
 
 class RemediateMismatchGroupView(PermissionRequiredMixin, View):
     """View to remediate a mismatch group by running GenerateConfigPlans job."""
-    
+
     permission_required = ["extras.run_job"]
-    
+
     def get(self, request):
         """Handle GET request to run the remediation job."""
-        feature_id = request.GET.get('feature_id')
-        config_hash = request.GET.get('config_hash')
-        
+        feature_id = request.GET.get("feature_id")
+        config_hash = request.GET.get("config_hash")
+
         if not feature_id or not config_hash:
             messages.error(request, "Missing feature_id or config_hash parameters.")
             return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
-        
+
         try:
             feature = models.ComplianceFeature.objects.get(pk=feature_id)
-            
+
             # Get all devices in this mismatch group
-            devices_in_group = models.ConfigComplianceHash.objects.filter(
-                config_type="actual",
-                rule__feature_id=feature_id,
-                config_hash=config_hash,
-                device__configcompliance__rule__feature_id=feature_id,
-                device__configcompliance__compliance=False
-            ).values_list('device_id', flat=True).distinct()
+            devices_in_group = (
+                models.ConfigComplianceHash.objects.filter(
+                    config_type="actual",
+                    rule__feature_id=feature_id,
+                    config_hash=config_hash,
+                    device__configcompliance__rule__feature_id=feature_id,
+                    device__configcompliance__compliance=False,
+                )
+                .values_list("device_id", flat=True)
+                .distinct()
+            )
 
             if not devices_in_group:
-                messages.warning(request, f"No devices found in mismatch group for this feature")
+                messages.warning(request, "No devices found in mismatch group for this feature")
                 return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
 
-            
             # Get devices with matching feature and config hash
             compliance_records = models.ConfigCompliance.objects.filter(
-                rule__feature_id=feature_id,
-                actual_config_hash=config_hash,
-                compliance=False
+                rule__feature_id=feature_id, actual_config_hash=config_hash, compliance=False
             )
-            
-            device_ids = list(compliance_records.values_list('device_id', flat=True))
-            
+
+            device_ids = list(compliance_records.values_list("device_id", flat=True))
+
             if not device_ids:
                 messages.warning(request, "No devices found for this mismatch group.")
                 return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
-            
-            # Get Device objects for the job filter  
-            devices = Device.objects.filter(id__in=device_ids)
-            
+
+            # Get Device objects for the job filter
+            # devices = Device.objects.filter(id__in=device_ids)
+
             # Get the GenerateConfigPlans job
             job = Job.objects.get(name="Generate Config Plans")
-            
+
             # Enqueue the job without serialize_data to avoid KeyError
             job_result = JobResult.enqueue_job(
                 job,
@@ -733,11 +736,11 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
                 feature=[feature.pk],
                 device=list(devices_in_group),
             )
-            
+
             messages.success(request, f"Remediation job started for {len(device_ids)} devices.")
             return redirect(job_result.get_absolute_url())
-            
-        except Exception as e:
+
+        except (Job.DoesNotExist, ValueError, TypeError, RuntimeError) as e:
             messages.error(request, f"Error starting remediation job: {str(e)}")
             return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
 
@@ -753,5 +756,3 @@ class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context["form"] = forms.GenerateIntendedConfigForm()
         return context
-
-

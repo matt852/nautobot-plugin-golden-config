@@ -152,7 +152,7 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         label="Actual Config Hash",
     )
     intended_config_hash = django_filters.CharFilter(
-        field_name="intended_config_hash", 
+        field_name="intended_config_hash",
         lookup_expr="exact",
         label="Intended Config Hash",
     )

@@ -5,7 +5,6 @@ from django_tables2 import Column, LinkColumn, TemplateColumn
 from django_tables2.utils import A
 from nautobot.apps.tables import BaseTable, BooleanColumn, TagColumn, ToggleColumn
 from nautobot.extras.tables import StatusTableMixin
-from django.urls import reverse
 
 from nautobot_golden_config import models
 from nautobot_golden_config.utilities.constant import CONFIG_FEATURES, ENABLE_BACKUP, ENABLE_COMPLIANCE, ENABLE_INTENDED
@@ -550,26 +549,24 @@ class ConfigPlanTable(StatusTableMixin, BaseTable):
             "status",
         )
 
+
 # Config Hash
 
 
-class ConfigMismatchGroupingTable(BaseTable):
+class ConfigComplianceHashTable(BaseTable):
     """Table for displaying configuration mismatch grouping results."""
 
-    feature_name = Column(
-        verbose_name="Feature",
-        accessor="feature_name"
-    )
+    feature_name = Column(verbose_name="Feature", accessor="feature_name")
     device_count = TemplateColumn(
         template_code="""
-        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_list' %}?feature_id={{ record.feature_id }}&actual_config_hash={{ record.config_hash }}&compliance=false" 
+        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_list' %}?feature_id={{ record.feature_id }}&actual_config_hash={{ record.config_hash }}&compliance=false"
            class="text-primary" style="text-decoration: none; font-weight: bold;">
             {{ record.device_count }} device{{ record.device_count|pluralize }}
         </a>
         """,
         verbose_name="Device Count",
         orderable=True,
-        order_by=("device_count",)
+        order_by=("device_count",),
     )
     config_snippet = TemplateColumn(
         template_code="""
@@ -588,7 +585,7 @@ class ConfigMismatchGroupingTable(BaseTable):
         </div>
         """,
         verbose_name="Configuration Snippet",
-        orderable=False
+        orderable=False,
     )
     actions = TemplateColumn(
         template_code="""
@@ -597,22 +594,22 @@ class ConfigMismatchGroupingTable(BaseTable):
         </a>
         """,
         verbose_name="Actions",
-        orderable=False
+        orderable=False,
     )
 
     class Meta(BaseTable.Meta):
-        """Meta information for ConfigMismatchGroupingTable."""
-        
+        """Meta information for ConfigComplianceHashTable."""
+
         model = models.ConfigComplianceHash
         fields = (
             "feature_name",
-            "device_count", 
+            "device_count",
             "config_snippet",
             "actions",
         )
         default_columns = (
             "feature_name",
             "device_count",
-            "config_snippet", 
+            "config_snippet",
             "actions",
         )
