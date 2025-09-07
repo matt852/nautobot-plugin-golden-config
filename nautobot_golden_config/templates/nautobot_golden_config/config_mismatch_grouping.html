@@ -26,6 +26,7 @@
                 <i class="mdi mdi-file-compare" style="color: #007bff;"></i>
                 Configuration Mismatch Groups
                 {% if table.rows %}
+                    <i class="mdi mdi-chevron-down toggle-all" style="color: #007bff; margin-left: 10px; cursor: pointer; display: inline-block;" title="Expand/Collapse All Configurations"></i>
                     <span class="badge pull-right" style="background-color: #007bff; color: white;">{{ table.rows|length }} group{{ table.rows|length|pluralize }}</span>
                 {% endif %}
             </h3>
@@ -56,6 +57,10 @@
 <script src="{% static 'js/tableconfig.js' %}"></script>
 <style>
 .config-chevron {
+    transition: transform 0.3s ease !important;
+    display: inline-block !important;
+}
+.toggle-all {
     transition: transform 0.3s ease !important;
     display: inline-block !important;
 }
@@ -94,6 +99,41 @@ document.addEventListener('DOMContentLoaded', function() {
             chevron.style.transform = 'rotate(180deg)';
         }
     });
+    
+    // Toggle all functionality
+    const toggleAll = document.querySelector('.toggle-all');
+    if (toggleAll) {
+        let allExpanded = true; // Start with all expanded
+        
+        toggleAll.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Toggle all config sections
+            toggles.forEach(function(toggle) {
+                const content = toggle.nextElementSibling;
+                const chevron = toggle.querySelector('i.config-chevron');
+                
+                if (content && chevron) {
+                    if (allExpanded) {
+                        // Collapse all
+                        content.style.display = 'none';
+                        chevron.style.transform = 'rotate(0deg)';
+                    } else {
+                        // Expand all
+                        content.style.display = 'block';
+                        chevron.style.transform = 'rotate(180deg)';
+                    }
+                }
+            });
+            
+            // Update toggle all state
+            allExpanded = !allExpanded;
+            toggleAll.style.transform = allExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+        
+        // Initialize toggle all to expanded state
+        toggleAll.style.transform = 'rotate(180deg)';
+    }
 });
 
 // Function to count config plans generated for this specific job

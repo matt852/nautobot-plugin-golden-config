@@ -713,3 +713,72 @@ class ConfigMismatchGroupingTemplateTestCase(TestCase):
         if "title=" in content:
             # Should have title attributes for icons/actions
             self.assertTrue("title=" in content)
+
+    def test_template_toggle_all_chevron_presence(self):
+        """Test that toggle all chevron is present and properly configured."""
+        url = reverse("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+        response = self.client.get(url)
+        content = response.content.decode()
+
+        # Check for toggle all chevron element
+        self.assertIn('class="mdi mdi-chevron-down toggle-all"', content)
+
+        # Check for proper styling
+        self.assertIn("color: #007bff", content)  # Blue color
+        self.assertIn("cursor: pointer", content)  # Clickable cursor
+        self.assertIn("display: inline-block", content)  # Required for CSS transforms
+
+        # Check for tooltip
+        self.assertIn('title="Expand/Collapse All Configurations"', content)
+
+    def test_template_toggle_all_javascript_functionality(self):
+        """Test that toggle all JavaScript functionality is properly implemented."""
+        url = reverse("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+        response = self.client.get(url)
+        content = response.content.decode()
+
+        # Check for toggle all JavaScript code
+        self.assertIn("Toggle all functionality", content)
+        self.assertIn(".toggle-all", content)
+        self.assertIn("querySelector('.toggle-all')", content)
+
+        # Check for state management variables
+        self.assertIn("allExpanded", content)
+
+        # Check for event listener setup
+        self.assertIn("addEventListener('click'", content)
+
+        # Check for bulk toggle logic
+        self.assertIn("toggles.forEach", content)
+
+    def test_template_toggle_all_css_styling(self):
+        """Test that toggle all chevron has proper CSS styling for animation."""
+        url = reverse("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+        response = self.client.get(url)
+        content = response.content.decode()
+
+        # Check for toggle all CSS class definition
+        self.assertIn(".toggle-all", content)
+
+        # Check for animation properties
+        self.assertIn("transition: transform 0.3s ease !important", content)
+        self.assertIn("display: inline-block !important", content)
+
+    def test_template_toggle_all_conditional_display(self):
+        """Test that toggle all chevron only appears when there are table rows."""
+        # First test with data (should show toggle all)
+        url = reverse("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+        response = self.client.get(url)
+        content = response.content.decode()
+
+        # Should contain toggle all when there are groups
+        self.assertIn("toggle-all", content)
+
+        # Now test without data (should not show toggle all)
+        models.ConfigComplianceHash.objects.all().delete()
+
+        response = self.client.get(url)
+        content = response.content.decode()
+
+        # Should not contain toggle all when there are no groups
+        self.assertNotIn("toggle-all", content)
