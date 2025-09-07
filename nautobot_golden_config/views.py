@@ -444,7 +444,7 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
 
     def get_extra_context(self, request, instance=None, **kwargs):
         """Add extra context for the template."""
-        context = super().get_extra_context(request, instance, **kwargs)
+        context = super().get_extra_context(request, instance, **kwargs)  # pylint: disable=no-member
         context.update(
             {
                 "title": "Configuration Mismatch Grouping Report",
@@ -452,6 +452,7 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
             }
         )
         return context
+
 
 class ComplianceFeatureUIViewSet(views.NautobotUIViewSet):
     """Views for the ComplianceFeature model."""
