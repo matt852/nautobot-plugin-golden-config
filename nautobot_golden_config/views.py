@@ -416,7 +416,7 @@ class ConfigComplianceOverview(generic.ObjectListView):
         return self.extra_content
 
 
-class ConfigMismatchGroupingView(PermissionRequiredMixin, TemplateView):  # generic.ObjectListView):
+class ConfigMismatchGroupingView(generic.ObjectListView):
     """View for configuration mismatch grouping report."""
 
     action_buttons = ("export",)
@@ -442,15 +442,9 @@ class ConfigMismatchGroupingView(PermissionRequiredMixin, TemplateView):  # gene
         .order_by("-device_count", "rule__feature__name")
     )
 
-    def setup(self, request, *args, **kwargs):
-        """Using request object to perform filtering based on query params."""
-        super().setup(request, *args, **kwargs)
-        # Apply user permissions to the base queryset
-        self.queryset = self.queryset.restrict(request.user, "view")
-
-    def get_context_data(self, **kwargs):
+    def get_extra_context(self, request, instance=None, **kwargs):
         """Add extra context for the template."""
-        context = super().get_context_data(**kwargs)
+        context = super().get_extra_context(request, instance, **kwargs)
         context.update(
             {
                 "title": "Configuration Mismatch Grouping Report",
@@ -458,11 +452,6 @@ class ConfigMismatchGroupingView(PermissionRequiredMixin, TemplateView):  # gene
             }
         )
         return context
-
-    @classmethod
-    def get_queryset(cls):
-        """Return the queryset for the view."""
-        return cls.queryset
 
 class ComplianceFeatureUIViewSet(views.NautobotUIViewSet):
     """Views for the ComplianceFeature model."""
