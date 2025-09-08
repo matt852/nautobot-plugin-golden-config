@@ -553,7 +553,7 @@ class ConfigPlanTable(StatusTableMixin, BaseTable):
 # Config Hash
 
 
-class ConfigComplianceHashTable(BaseTable):
+class ConfigMismatchHashTable(BaseTable):
     """Table for displaying configuration mismatch grouping results."""
 
     feature_name = Column(verbose_name="Feature", accessor="feature_name")
@@ -598,7 +598,7 @@ class ConfigComplianceHashTable(BaseTable):
     )
 
     class Meta(BaseTable.Meta):
-        """Meta information for ConfigComplianceHashTable."""
+        """Meta information for ConfigMismatchHashTable."""
 
         model = models.ConfigComplianceHash
         fields = (

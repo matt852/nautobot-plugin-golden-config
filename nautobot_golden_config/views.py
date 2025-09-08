@@ -422,7 +422,7 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
     action_buttons = ("export",)
     filterset = filters.ConfigMismatchGroupingFilterSet
     filterset_form = forms.ConfigMismatchFilterForm
-    table = tables.ConfigComplianceHashTable
+    table = tables.ConfigMismatchHashTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
 
     queryset = (

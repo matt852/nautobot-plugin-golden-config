@@ -389,45 +389,6 @@ class ComplianceRule(PrimaryModel):  # pylint: disable=too-many-ancestors
     "relationships",
     "webhooks",
 )
-class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
-    """Configuration compliance hash storage for grouping identical configurations."""
-
-    device = models.ForeignKey(to="dcim.Device", on_delete=models.CASCADE, help_text="The device")
-    rule = models.ForeignKey(to="ComplianceRule", on_delete=models.CASCADE, related_name="config_hashes")
-    config_type = models.CharField(
-        max_length=20,
-        choices=[("actual", "Actual"), ("intended", "Intended")],
-        help_text="Type of configuration (actual or intended)",
-    )
-    config_hash = models.CharField(
-        max_length=64, blank=True, help_text="SHA-256 hash of the configuration content", db_index=True
-    )
-    config_content = models.JSONField(blank=True, help_text="Configuration content for display purposes")
-
-    class Meta:
-        """Set unique together fields for model."""
-
-        ordering = ["device", "rule", "config_type"]
-        unique_together = ("device", "rule", "config_type")
-        indexes = [
-            models.Index(fields=["rule", "config_hash"]),
-            models.Index(fields=["rule", "config_type", "config_hash"]),
-        ]
-
-    def __str__(self):
-        """String representation of the hash record."""
-        return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash[:8]}"
-
-
-@extras_features(
-    "custom_fields",
-    "custom_links",
-    "custom_validators",
-    "export_templates",
-    "graphql",
-    "relationships",
-    "webhooks",
-)
 class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too-many-instance-attributes
     """Configuration compliance details."""
 
@@ -988,3 +949,42 @@ class ConfigPlan(PrimaryModel):  # pylint: disable=too-many-ancestors
     def __str__(self):
         """Return a simple string if model is called."""
         return f"{self.device.name}-{self.plan_type}-{self.created}"
+
+
+@extras_features(
+    "custom_fields",
+    "custom_links",
+    "custom_validators",
+    "export_templates",
+    "graphql",
+    "relationships",
+    "webhooks",
+)
+class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
+    """Configuration compliance hash storage for grouping identical configurations."""
+
+    device = models.ForeignKey(to="dcim.Device", on_delete=models.CASCADE, help_text="The device")
+    rule = models.ForeignKey(to="ComplianceRule", on_delete=models.CASCADE, related_name="config_hashes")
+    config_type = models.CharField(
+        max_length=20,
+        choices=[("actual", "Actual"), ("intended", "Intended")],
+        help_text="Type of configuration (actual or intended)",
+    )
+    config_hash = models.CharField(
+        max_length=64, blank=True, help_text="SHA-256 hash of the configuration content", db_index=True
+    )
+    config_content = models.JSONField(blank=True, help_text="Configuration content for display purposes")
+
+    class Meta:
+        """Set unique together fields for model."""
+
+        ordering = ["device", "rule", "config_type"]
+        unique_together = ("device", "rule", "config_type")
+        indexes = [
+            models.Index(fields=["rule", "config_hash"]),
+            models.Index(fields=["rule", "config_type", "config_hash"]),
+        ]
+
+    def __str__(self):
+        """String representation of the hash record."""
+        return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash[:8]}"

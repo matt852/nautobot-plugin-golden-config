@@ -642,7 +642,7 @@ class GenerateIntendedConfigForm(django_forms.Form):
             self.fields["git_repository_branch"].widget = django_forms.HiddenInput
 
 
-class ConfigMismatchFilterForm(django_forms.Form):
+class ConfigMismatchFilterForm(DeviceRelatedFilterForm):
     """Filter Form for Config Mismatch."""
 
     model = models.ConfigComplianceHash
@@ -658,3 +658,16 @@ class ConfigMismatchFilterForm(django_forms.Form):
         "device",
     ]
     q = django_forms.CharField(required=False, label="Search")
+
+    def __init__(self, *args, **kwargs):
+        """Required for status to work."""
+        super().__init__(*args, **kwargs)
+        self.fields["device_status"] = forms.DynamicModelMultipleChoiceField(
+            required=False,
+            queryset=Status.objects.all(),
+            query_params={"content_types": Device._meta.label_lower},
+            display_field="label",
+            label="Device Status",
+            to_field_name="name",
+        )
+        self.order_fields(self.field_order)  # Reorder fields again
