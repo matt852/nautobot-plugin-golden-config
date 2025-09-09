@@ -558,11 +558,7 @@ class ConfigMismatchHashTable(BaseTable):
 
     pk = ToggleColumn()
     device = LinkColumn("dcim:device", args=[A("device.pk")], verbose_name="Device")
-    rule = LinkColumn(
-        "plugins:nautobot_golden_config:compliancerule", 
-        args=[A("rule.pk")], 
-        verbose_name="Feature"
-    )
+    rule = LinkColumn("plugins:nautobot_golden_config:compliancerule", args=[A("rule.pk")], verbose_name="Feature")
     config_hash = Column(verbose_name="Config Hash", accessor="config_hash")
 
     class Meta(BaseTable.Meta):

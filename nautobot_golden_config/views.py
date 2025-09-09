@@ -646,16 +646,14 @@ class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
 class ConfigMismatchHashViewSet(views.NautobotUIViewSet):
     """View for configuration mismatch hashes with bulk operations."""
 
-    filterset_class = filters.ConfigMismatchGroupingFilterSet  
+    filterset_class = filters.ConfigMismatchGroupingFilterSet
     filterset_form_class = forms.ConfigMismatchFilterForm
     table_class = tables.ConfigMismatchHashTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
-    
-    # Base queryset of individual ConfigComplianceHash objects 
+
+    # Base queryset of individual ConfigComplianceHash objects
     queryset = models.ConfigComplianceHash.objects.filter(
-        config_type="actual",
-        device__configcompliance__rule=F("rule"), 
-        device__configcompliance__compliance=False
+        config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
     ).select_related("device", "rule__feature")
 
     def get_extra_context(self, request, instance=None, **kwargs):
@@ -668,6 +666,82 @@ class ConfigMismatchHashViewSet(views.NautobotUIViewSet):
             }
         )
         return context
+
+    def perform_bulk_destroy(self, request, **kwargs):
+        """Override bulk destroy to delete both actual and intended hashes for the same device/rule combinations."""
+        model = self.queryset.model
+
+        # Handle the primary key collection like the existing ConfigCompliance bulk delete
+        if request.POST.get("_all"):
+            filter_params = self.get_filter_params(request)
+            if not filter_params:
+                hash_objects = model.objects.only("pk").all().values_list("pk", flat=True)
+            elif self.filterset_class is None:
+                raise NotImplementedError("filterset_class must be defined to use _all")
+            else:
+                hash_objects = self.filterset_class(filter_params, model.objects.only("pk")).qs
+            self.pk_list = list(hash_objects.values_list("pk", flat=True))
+        else:
+            # Get the pk list from the form
+            self.pk_list = request.POST.getlist("pk")
+
+        form_class = self.get_form_class(**kwargs)
+        data = {}
+
+        if "_confirm" in request.POST:
+            form = form_class(request.POST)
+            if form.is_valid():
+                # Perform the actual deletion
+                if not self.pk_list:
+                    messages.error(request, "No items selected for deletion.")
+                    return redirect(self.get_return_url(request))
+
+                # Get the selected ConfigComplianceHash records
+                selected_hashes = models.ConfigComplianceHash.objects.filter(pk__in=self.pk_list)
+
+                if not selected_hashes.exists():
+                    messages.error(request, "Selected items not found.")
+                    return redirect(self.get_return_url(request))
+
+                # Extract device/rule combinations from selected hashes
+                device_rule_combinations = set()
+                for hash_record in selected_hashes:
+                    device_rule_combinations.add((hash_record.device_id, hash_record.rule_id))
+
+                # Delete both actual and intended hashes for the same device/rule combinations
+                deleted_count = 0
+                for device_id, rule_id in device_rule_combinations:
+                    # Delete both actual and intended config hashes for this device/rule combination
+                    hashes_to_delete = models.ConfigComplianceHash.objects.filter(device_id=device_id, rule_id=rule_id)
+                    count = hashes_to_delete.count()
+                    hashes_to_delete.delete()
+                    deleted_count += count
+
+                messages.success(
+                    request,
+                    f"Successfully deleted {deleted_count} configuration hash records "
+                    f"(both actual and intended) for {len(device_rule_combinations)} device/rule combinations.",
+                )
+
+                return redirect(self.get_return_url(request))
+            return self.form_invalid(form)
+
+        # Show confirmation page
+        table = self.table_class(self.queryset.filter(pk__in=self.pk_list), orderable=False)
+
+        if not table.rows:
+            messages.warning(
+                request,
+                f"No {self.queryset.model._meta.verbose_name_plural} were selected for deletion.",
+            )
+            return redirect(self.get_return_url(request))
+
+        if not request.POST.get("_all"):
+            data.update({"table": table, "total_objs_to_delete": len(table.rows)})
+        else:
+            data.update({"table": None, "delete_all": True, "total_objs_to_delete": len(table.rows)})
+
+        return Response(data)
 
 
 class ConfigMismatchGroupingView(generic.ObjectListView):
@@ -690,9 +764,7 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
             feature_name=F("rule__feature__name"),
             feature_slug=F("rule__feature__slug"),
         )
-        .filter(
-            device_count__gt=1
-        )
+        .filter(device_count__gt=1)
         .order_by("-device_count", "rule__feature__name")
     )
 
@@ -706,6 +778,7 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
             }
         )
         return context
+
 
 class RemediateMismatchGroupView(PermissionRequiredMixin, View):
     """View to remediate a mismatch group by running GenerateConfigPlans job."""
