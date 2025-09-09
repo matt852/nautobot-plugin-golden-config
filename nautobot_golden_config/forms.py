@@ -642,7 +642,7 @@ class GenerateIntendedConfigForm(django_forms.Form):
             self.fields["git_repository_branch"].widget = django_forms.HiddenInput
 
 
-class ConfigMismatchFilterForm(DeviceRelatedFilterForm):
+class ConfigComplianceHashFilterForm(DeviceRelatedFilterForm):
     """Filter Form for Config Mismatch."""
 
     model = models.ConfigComplianceHash

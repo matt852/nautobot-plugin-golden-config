@@ -169,7 +169,7 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         fields = "__all__"
 
 
-class ConfigMismatchGroupingFilterSet(GoldenConfigFilterSet):
+class ConfigComplianceHashFilterSet(GoldenConfigFilterSet):
     """Custom filter for mismatch grouping that handles device filtering properly."""
 
     location = TreeNodeMultipleChoiceFilter(
@@ -192,7 +192,7 @@ class ConfigMismatchGroupingFilterSet(GoldenConfigFilterSet):
         label="Device (name or ID)",
     )
 
-    def filter_device(self, queryset, name, value):
+    def filter_device(self, queryset, _, value):
         """Custom device filtering for grouped mismatch data."""
         # Get the devices to filter by
         device_ids = [device.id if hasattr(device, "id") else device for device in value]
@@ -236,8 +236,8 @@ class ConfigMismatchGroupingFilterSet(GoldenConfigFilterSet):
             )
 
             return grouped_qs
-        else:
-            return queryset.none()
+
+        return queryset.none()
 
     class Meta:
         """Boilerplate filter Meta data for Config Hash."""

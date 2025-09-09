@@ -8,7 +8,8 @@ import yaml
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count, ExpressionWrapper, F, FloatField, Max, Q
+from django.db.models import CharField, Count, ExpressionWrapper, F, FloatField, Max, Q, Value
+from django.db.models.functions import Cast, Concat
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -643,18 +644,23 @@ class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
         return context
 
 
-class ConfigMismatchHashViewSet(views.NautobotUIViewSet):
+class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     """View for configuration mismatch hashes with bulk operations."""
 
-    filterset_class = filters.ConfigMismatchGroupingFilterSet
-    filterset_form_class = forms.ConfigMismatchFilterForm
-    table_class = tables.ConfigMismatchHashTable
+    filterset_class = filters.ConfigComplianceHashFilterSet
+    filterset_form_class = forms.ConfigComplianceHashFilterForm
+    table_class = tables.ConfigComplianceHashTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
 
     # Base queryset of individual ConfigComplianceHash objects
     queryset = models.ConfigComplianceHash.objects.filter(
         config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
     ).select_related("device", "rule__feature")
+
+    def __init__(self, *args, **kwargs):
+        """Used to set default variables on ConfigComplianceHashUIViewSet."""
+        super().__init__(*args, **kwargs)
+        self.pk_list = None
 
     def get_extra_context(self, request, instance=None, **kwargs):
         """Add extra context for the template."""
@@ -681,6 +687,9 @@ class ConfigMismatchHashViewSet(views.NautobotUIViewSet):
             else:
                 hash_objects = self.filterset_class(filter_params, model.objects.only("pk")).qs
             self.pk_list = list(hash_objects.values_list("pk", flat=True))
+        elif "_confirm" not in request.POST:
+            # Initial selection - get the pk list from the form
+            self.pk_list = request.POST.getlist("pk")
         else:
             # Get the pk list from the form
             self.pk_list = request.POST.getlist("pk")
@@ -708,14 +717,24 @@ class ConfigMismatchHashViewSet(views.NautobotUIViewSet):
                 for hash_record in selected_hashes:
                     device_rule_combinations.add((hash_record.device_id, hash_record.rule_id))
 
-                # Delete both actual and intended hashes for the same device/rule combinations
-                deleted_count = 0
-                for device_id, rule_id in device_rule_combinations:
-                    # Delete both actual and intended config hashes for this device/rule combination
-                    hashes_to_delete = models.ConfigComplianceHash.objects.filter(device_id=device_id, rule_id=rule_id)
-                    count = hashes_to_delete.count()
-                    hashes_to_delete.delete()
-                    deleted_count += count
+                # Delete both actual and intended hashes for the same device/rule combinations using bulk delete
+                # Use Django's tuple matching to filter by (device_id, rule_id) pairs in a single query
+                # Create a list of concatenated device_rule identifiers for matching
+                device_rule_identifiers = [f"{device_id}-{rule_id}" for device_id, rule_id in device_rule_combinations]
+
+                # Perform single bulk delete operation using concatenated field matching
+                # Cast both fields to CharField to avoid mixed type errors
+                deleted_count, _ = (
+                    models.ConfigComplianceHash.objects.annotate(
+                        device_rule_key=Concat(
+                            Cast("device_id", output_field=CharField()),
+                            Value("-"),
+                            Cast("rule_id", output_field=CharField()),
+                        )
+                    )
+                    .filter(device_rule_key__in=device_rule_identifiers)
+                    .delete()
+                )
 
                 messages.success(
                     request,
@@ -748,8 +767,8 @@ class ConfigMismatchGroupingView(generic.ObjectListView):
     """View for configuration mismatch grouping report."""
 
     action_buttons = ("export",)
-    filterset = filters.ConfigMismatchGroupingFilterSet
-    filterset_form = forms.ConfigMismatchFilterForm
+    filterset = filters.ConfigComplianceHashFilterSet
+    filterset_form = forms.ConfigComplianceHashFilterForm
     table = tables.ConfigMismatchGroupTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
 

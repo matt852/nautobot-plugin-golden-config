@@ -9,7 +9,7 @@ from nautobot.apps.testing import TestCase
 from nautobot.dcim.models import Device
 
 from nautobot_golden_config import models
-from nautobot_golden_config.tables import ConfigMismatchHashTable
+from nautobot_golden_config.tables import ConfigComplianceHashTable
 from nautobot_golden_config.views import ConfigMismatchGroupingView
 
 from .conftest import create_device_data, create_feature_rule_json
@@ -129,7 +129,7 @@ class ConfigMismatchGroupingViewTestCase(TestCase):
         self.assertIn("table", response.context)
 
         # Check that table is the correct type
-        self.assertIsInstance(response.context["table"], ConfigMismatchHashTable)
+        self.assertIsInstance(response.context["table"], ConfigComplianceHashTable)
 
     def test_mismatch_grouping_groups_identical_configs(self):
         """Test that the view correctly groups devices with identical configurations."""
@@ -328,15 +328,15 @@ class ConfigComplianceHashTableTestCase(TestCase):
     def test_table_initialization(self):
         """Test that ConfigComplianceHashTable can be initialized properly."""
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Table should initialize without errors
-        self.assertIsInstance(table, ConfigMismatchHashTable)
+        self.assertIsInstance(table, ConfigComplianceHashTable)
 
     def test_table_columns_present(self):
         """Test that all expected columns are present in the table."""
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Check that expected columns exist
         expected_columns = ["feature_name", "device_count", "config_snippet", "actions"]
@@ -346,7 +346,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
     def test_table_feature_name_column(self):
         """Test feature_name column rendering."""
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Get the first row
         rows = list(table.data)
@@ -358,7 +358,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
     def test_table_device_count_column(self):
         """Test device_count column rendering and link generation."""
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Get the first row
         rows = list(table.data)
@@ -373,7 +373,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         # The test data already has records for device1 and device2 with hash "test123hash"
 
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
         table_html = table.as_html(request=RequestFactory().get("/"))
@@ -392,7 +392,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         """Test config_snippet column with empty configuration content."""
         # Use the existing test data from setUpTestData which should already create groups
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
         table_html = table.as_html(request=RequestFactory().get("/"))
@@ -412,7 +412,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         # The test data already has records for device1 and device2 with hash "test123hash"
 
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
         table_html = table.as_html(request=RequestFactory().get("/"))
@@ -429,7 +429,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         """Test that table supports proper ordering."""
         # Create table with empty queryset to test column properties
         queryset = ConfigMismatchGroupingView().queryset.none()  # Empty queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Check that device_count column is orderable
         device_count_column = table.columns["device_count"]
@@ -443,7 +443,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         """Test that columns have appropriate verbose names."""
         # Create table with empty queryset to test column properties
         queryset = ConfigMismatchGroupingView().queryset.none()  # Empty queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Check verbose names
         self.assertEqual(table.columns["feature_name"].verbose_name, "Feature")
@@ -498,7 +498,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         )
 
         queryset = ConfigMismatchGroupingView().queryset
-        table = ConfigMismatchHashTable(data=queryset)
+        table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
         table_html = table.as_html(request=RequestFactory().get("/"))

@@ -553,33 +553,56 @@ class ConfigPlanTable(StatusTableMixin, BaseTable):
 # Config Hash
 
 
-class ConfigMismatchHashTable(BaseTable):
+class ConfigComplianceHashTable(BaseTable):
     """Table for displaying individual ConfigComplianceHash records with bulk operations."""
 
     pk = ToggleColumn()
     device = LinkColumn("dcim:device", args=[A("device.pk")], verbose_name="Device")
     rule = LinkColumn("plugins:nautobot_golden_config:compliancerule", args=[A("rule.pk")], verbose_name="Feature")
-    config_hash = Column(verbose_name="Config Hash", accessor="config_hash")
+    actual_config_hash = Column(verbose_name="Actual Config Hash", accessor="config_hash")
+    intended_config_hash = Column(verbose_name="Intended Config Hash", accessor="config_hash")
+
+    def render_actual_config_hash(self, value):
+        """Render actual config hash with only the last 10 characters."""
+        if value:
+            return f"...{value[-10:]}"
+        return value
+
+    def render_intended_config_hash(self, record):
+        """Render intended config hash with only the last 10 characters."""
+        # Since this table shows actual config type records, we need to get the intended hash
+        # from the related ConfigCompliance record or return a placeholder
+        try:
+            # Try to get intended hash from ConfigCompliance
+            compliance = models.ConfigCompliance.objects.get(device=record.device, rule=record.rule)
+            intended_hash = compliance.intended_config_hash
+            if intended_hash:
+                return f"...{intended_hash[-10:]}"
+            return "--"
+        except models.ConfigCompliance.DoesNotExist:
+            return "--"
 
     class Meta(BaseTable.Meta):
-        """Meta information for ConfigMismatchHashTable."""
+        """Meta information for ConfigComplianceHashTable."""
 
         model = models.ConfigComplianceHash
         fields = (
             "pk",
             "device",
             "rule",
-            "config_hash",
+            "actual_config_hash",
+            "intended_config_hash",
         )
         default_columns = (
             "pk",
             "device",
             "rule",
-            "config_hash",
+            "actual_config_hash",
+            "intended_config_hash",
         )
 
 
-class ConfigMismatchGroupTable(BaseTable):
+class ConfigMismatchGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     """Table for displaying configuration mismatch grouping results."""
 
     feature_name = Column(verbose_name="Feature", accessor="feature_name")
