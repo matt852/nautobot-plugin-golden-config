@@ -53,7 +53,6 @@ if ENABLE_COMPLIANCE:
         )
     )
 
-
 if ENABLE_COMPLIANCE:
     items_operate.append(
         NavMenuItem(
@@ -64,6 +63,13 @@ if ENABLE_COMPLIANCE:
     )
 
 if ENABLE_COMPLIANCE:
+    items_operate.append(
+        NavMenuItem(
+            link="plugins:nautobot_golden_config:configcompliancehash_list",
+            name="Config Hashes",
+            permissions=["nautobot_golden_config.view_configmismatch"],
+        )
+    )
     items_operate.append(
         NavMenuItem(
             link="plugins:nautobot_golden_config:configcompliance_mismatch_grouping",

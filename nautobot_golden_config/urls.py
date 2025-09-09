@@ -19,6 +19,7 @@ router.register("remediation-setting", views.RemediationSettingUIViewSet)
 router.register("config-plan", views.ConfigPlanUIViewSet)
 router.register("config-compliance", views.ConfigComplianceUIViewSet)
 router.register("golden-config", views.GoldenConfigUIViewSet)
+router.register("mismatch-hash", views.ConfigMismatchHashViewSet)
 
 
 urlpatterns = [

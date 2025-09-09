@@ -416,44 +416,6 @@ class ConfigComplianceOverview(generic.ObjectListView):
         return self.extra_content
 
 
-class ConfigMismatchGroupingView(generic.ObjectListView):
-    """View for configuration mismatch grouping report."""
-
-    action_buttons = ("export",)
-    filterset = filters.ConfigMismatchGroupingFilterSet
-    filterset_form = forms.ConfigMismatchFilterForm
-    table = tables.ConfigMismatchHashTable
-    template_name = "nautobot_golden_config/config_mismatch_grouping.html"
-
-    queryset = (
-        models.ConfigComplianceHash.objects.filter(
-            config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
-        )
-        .values("rule__feature__id", "rule__feature__name", "rule__feature__slug", "config_hash", "config_content")
-        .annotate(
-            device_count=Count("device", distinct=True),
-            feature_id=F("rule__feature__id"),
-            feature_name=F("rule__feature__name"),
-            feature_slug=F("rule__feature__slug"),
-        )
-        .filter(
-            device_count__gt=1
-        )
-        .order_by("-device_count", "rule__feature__name")
-    )
-
-    def get_extra_context(self, request, instance=None, **kwargs):
-        """Add extra context for the template."""
-        context = super().get_extra_context(request, instance, **kwargs)  # pylint: disable=no-member
-        context.update(
-            {
-                "title": "Configuration Mismatch Grouping Report",
-                "compliance": constant.ENABLE_COMPLIANCE,
-            }
-        )
-        return context
-
-
 class ComplianceFeatureUIViewSet(views.NautobotUIViewSet):
     """Views for the ComplianceFeature model."""
 
@@ -680,6 +642,70 @@ class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
         context["form"] = forms.GenerateIntendedConfigForm()
         return context
 
+
+class ConfigMismatchHashViewSet(views.NautobotUIViewSet):
+    """View for configuration mismatch hashes with bulk operations."""
+
+    filterset_class = filters.ConfigMismatchGroupingFilterSet  
+    filterset_form_class = forms.ConfigMismatchFilterForm
+    table_class = tables.ConfigMismatchHashTable
+    template_name = "nautobot_golden_config/config_mismatch_grouping.html"
+    
+    # Base queryset of individual ConfigComplianceHash objects 
+    queryset = models.ConfigComplianceHash.objects.filter(
+        config_type="actual",
+        device__configcompliance__rule=F("rule"), 
+        device__configcompliance__compliance=False
+    ).select_related("device", "rule__feature")
+
+    def get_extra_context(self, request, instance=None, **kwargs):
+        """Add extra context for the template."""
+        context = super().get_extra_context(request, instance, **kwargs)  # pylint: disable=no-member
+        context.update(
+            {
+                "title": "Configuration Mismatch Hashes",
+                "compliance": constant.ENABLE_COMPLIANCE,
+            }
+        )
+        return context
+
+
+class ConfigMismatchGroupingView(generic.ObjectListView):
+    """View for configuration mismatch grouping report."""
+
+    action_buttons = ("export",)
+    filterset = filters.ConfigMismatchGroupingFilterSet
+    filterset_form = forms.ConfigMismatchFilterForm
+    table = tables.ConfigMismatchGroupTable
+    template_name = "nautobot_golden_config/config_mismatch_grouping.html"
+
+    queryset = (
+        models.ConfigComplianceHash.objects.filter(
+            config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
+        )
+        .values("rule__feature__id", "rule__feature__name", "rule__feature__slug", "config_hash", "config_content")
+        .annotate(
+            device_count=Count("device", distinct=True),
+            feature_id=F("rule__feature__id"),
+            feature_name=F("rule__feature__name"),
+            feature_slug=F("rule__feature__slug"),
+        )
+        .filter(
+            device_count__gt=1
+        )
+        .order_by("-device_count", "rule__feature__name")
+    )
+
+    def get_extra_context(self, request, instance=None, **kwargs):
+        """Add extra context for the template."""
+        context = super().get_extra_context(request, instance, **kwargs)  # pylint: disable=no-member
+        context.update(
+            {
+                "title": "Configuration Mismatch Grouping Report",
+                "compliance": constant.ENABLE_COMPLIANCE,
+            }
+        )
+        return context
 
 class RemediateMismatchGroupView(PermissionRequiredMixin, View):
     """View to remediate a mismatch group by running GenerateConfigPlans job."""

@@ -554,6 +554,36 @@ class ConfigPlanTable(StatusTableMixin, BaseTable):
 
 
 class ConfigMismatchHashTable(BaseTable):
+    """Table for displaying individual ConfigComplianceHash records with bulk operations."""
+
+    pk = ToggleColumn()
+    device = LinkColumn("dcim:device", args=[A("device.pk")], verbose_name="Device")
+    rule = LinkColumn(
+        "plugins:nautobot_golden_config:compliancerule", 
+        args=[A("rule.pk")], 
+        verbose_name="Feature"
+    )
+    config_hash = Column(verbose_name="Config Hash", accessor="config_hash")
+
+    class Meta(BaseTable.Meta):
+        """Meta information for ConfigMismatchHashTable."""
+
+        model = models.ConfigComplianceHash
+        fields = (
+            "pk",
+            "device",
+            "rule",
+            "config_hash",
+        )
+        default_columns = (
+            "pk",
+            "device",
+            "rule",
+            "config_hash",
+        )
+
+
+class ConfigMismatchGroupTable(BaseTable):
     """Table for displaying configuration mismatch grouping results."""
 
     feature_name = Column(verbose_name="Feature", accessor="feature_name")
