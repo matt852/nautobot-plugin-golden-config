@@ -611,6 +611,17 @@ class ConfigComplianceHashTable(BaseTable):
         except models.ConfigComplianceHash.DoesNotExist:
             return "--"
 
+    # actions = TemplateColumn(
+    #     template_code="""
+    #     <a href="{% url 'plugins:nautobot_golden_config:configcompliancehash_delete' pk=record.pk %}" 
+    #        class="btn btn-sm btn-outline-danger" title="Delete Hash Record">
+    #         <i class="mdi mdi-trash-can-outline"></i>
+    #     </a>
+    #     """,
+    #     verbose_name="Actions",
+    #     orderable=False,
+    # )
+
     class Meta(BaseTable.Meta):
         """Meta information for ConfigComplianceHashTable."""
 
@@ -621,7 +632,7 @@ class ConfigComplianceHashTable(BaseTable):
             "rule",
             "actual_config_hash",
             "intended_config_hash",
-            "actions",
+            # "actions",
         )
         default_columns = (
             "pk",
@@ -629,7 +640,7 @@ class ConfigComplianceHashTable(BaseTable):
             "rule",
             "actual_config_hash",
             "intended_config_hash",
-            "actions",
+            # "actions",
         )
 
 
@@ -671,9 +682,12 @@ class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     )
     actions = TemplateColumn(
         template_code="""
-        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_remediate' %}?feature_id={{ record.feature_id }}&config_hash={{ record.config_hash }}">
-            <i class="mdi mdi-map-check-outline" title="Generate Remediation Config Plans"></i>
-        </a>
+        <div class="btn-group" role="group">
+            <a href="{% url 'plugins:nautobot_golden_config:configcompliance_remediate' %}?feature_id={{ record.feature_id }}&config_hash={{ record.config_hash }}" 
+               class="btn btn-sm btn-outline-primary" title="Generate Remediation Config Plans">
+                <i class="mdi mdi-map-check-outline"></i>
+            </a>
+        </div>
         """,
         verbose_name="Actions",
         orderable=False,

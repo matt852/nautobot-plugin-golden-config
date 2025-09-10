@@ -652,10 +652,13 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     table_class = tables.ConfigComplianceHashTable
     template_name = "nautobot_golden_config/config_hash_grouping.html"
 
-    # Base queryset of individual ConfigComplianceHash objects
+    # Base queryset of individual ConfigComplianceHash objects  
+    # Show actual config hashes where there's a corresponding ConfigCompliance record
     queryset = models.ConfigComplianceHash.objects.filter(
-        config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
-    ).select_related("device", "rule__feature")
+        config_type="actual"
+    ).select_related("device", "rule__feature").filter(
+        device__configcompliance__rule=F("rule")
+    ).distinct()
 
     def __init__(self, *args, **kwargs):
         """Used to set default variables on ConfigComplianceHashUIViewSet."""
@@ -878,8 +881,11 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
                 
                 return redirect(self.get_return_url(request))
 
-        # Show confirmation page
-        selected_hash_groups = model.objects.filter(pk__in=self.pk_list)
+        # Show confirmation page - include feature name data for display
+        selected_hash_groups = model.objects.filter(pk__in=self.pk_list).select_related("rule__feature").annotate(
+            feature_name=F("rule__feature__name"),
+            feature_id=F("rule__feature__id"),
+        )
         table = tables.ConfigHashGroupTable(selected_hash_groups)
 
         if not request.POST.get("_all"):
