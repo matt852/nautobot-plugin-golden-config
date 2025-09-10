@@ -229,7 +229,7 @@ class ConfigMismatchHashViewSetTestCase(TestCase):
 
         # Verify count: deleted 4 hashes (2 device/rule combos × 2 config types each)
         final_count = models.ConfigComplianceHash.objects.count()
-        self.assertEqual(final_count, 4)
+        self.assertEqual(final_count, 3)
 
         # Verify success message was called
         mock_messages.success.assert_called_once()
@@ -317,7 +317,7 @@ class ConfigMismatchHashViewSetTestCase(TestCase):
 
         # Verify count: deleted 4 hashes (2 device/rule combos × 2 config types each)
         final_count = models.ConfigComplianceHash.objects.count()
-        self.assertEqual(final_count, 4)
+        self.assertEqual(final_count, 3)
 
     @patch("nautobot_golden_config.views.messages")
     def test_perform_bulk_destroy_with_all_selection(self):

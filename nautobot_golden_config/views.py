@@ -652,13 +652,14 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     table_class = tables.ConfigComplianceHashTable
     template_name = "nautobot_golden_config/config_hash_grouping.html"
 
-    # Base queryset of individual ConfigComplianceHash objects  
+    # Base queryset of individual ConfigComplianceHash objects
     # Show actual config hashes where there's a corresponding ConfigCompliance record
-    queryset = models.ConfigComplianceHash.objects.filter(
-        config_type="actual"
-    ).select_related("device", "rule__feature").filter(
-        device__configcompliance__rule=F("rule")
-    ).distinct()
+    queryset = (
+        models.ConfigComplianceHash.objects.filter(config_type="actual")
+        .select_related("device", "rule__feature")
+        .filter(device__configcompliance__rule=F("rule"))
+        .distinct()
+    )
 
     def __init__(self, *args, **kwargs):
         """Used to set default variables on ConfigComplianceHashUIViewSet."""
@@ -773,17 +774,21 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
     filterset_form_class = forms.ConfigHashGroupingFilterForm
     table_class = tables.ConfigHashGroupTable
     template_name = "nautobot_golden_config/config_hash_grouping.html"
-    
+
     # Disable add and import actions since this is a read-only report
     action_buttons = []
 
     queryset = (
         models.ConfigHashGrouping.objects.annotate(
-            device_count=Count("hash_records__device", distinct=True, filter=Q(
-                hash_records__config_type="actual",
-                hash_records__device__configcompliance__rule=F("rule"),
-                hash_records__device__configcompliance__compliance=False
-            )),
+            device_count=Count(
+                "hash_records__device",
+                distinct=True,
+                filter=Q(
+                    hash_records__config_type="actual",
+                    hash_records__device__configcompliance__rule=F("rule"),
+                    hash_records__device__configcompliance__compliance=False,
+                ),
+            ),
             feature_id=F("rule__feature__id"),
             feature_name=F("rule__feature__name"),
             feature_slug=F("rule__feature__slug"),
@@ -802,11 +807,11 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
             }
         )
         return context
-    
+
     def perform_bulk_destroy(self, request, **kwargs):
         """Override bulk destroy to cascade delete related ConfigComplianceHash records for each group's rule."""
         model = self.queryset.model
-        
+
         # Handle the primary key collection like the existing ConfigCompliance bulk delete
         if request.POST.get("_all"):
             filter_params = self.get_filter_params(request)
@@ -834,57 +839,57 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
                 if not self.pk_list:
                     messages.error(request, "No hash groups selected for deletion.")
                     return redirect(self.get_return_url(request))
-                
+
                 try:
                     # Get the selected groups before deletion
                     selected_groups = model.objects.filter(pk__in=self.pk_list).select_related("rule")
-                    
+
                     # Track what we're deleting for the success message
                     group_count = selected_groups.count()
                     device_rule_combinations = set()
-                    
+
                     # For each group, collect the rule and find all related hash records
                     for group in selected_groups:
                         # Find all ConfigComplianceHash records for this rule that reference this group
-                        devices_in_group = (
-                            models.ConfigComplianceHash.objects.filter(
-                                config_group=group,
-                                config_type="actual"
-                            ).values_list("device_id", flat=True)
-                        )
-                        
+                        devices_in_group = models.ConfigComplianceHash.objects.filter(
+                            config_group=group, config_type="actual"
+                        ).values_list("device_id", flat=True)
+
                         # Add all device/rule combinations that will be affected
                         for device_id in devices_in_group:
                             device_rule_combinations.add((device_id, group.rule.id))
-                    
+
                     # Delete both actual and intended ConfigComplianceHash records for all affected device/rule combinations
                     hash_records_deleted = 0
                     for device_id, rule_id in device_rule_combinations:
                         deleted_count, _ = models.ConfigComplianceHash.objects.filter(
-                            device_id=device_id,
-                            rule_id=rule_id
+                            device_id=device_id, rule_id=rule_id
                         ).delete()
                         hash_records_deleted += deleted_count
-                    
+
                     # Now delete the hash groups themselves
                     selected_groups.delete()
-                    
+
                     messages.success(
                         request,
                         f"Successfully deleted {group_count} configuration hash group{'' if group_count == 1 else 's'} "
                         f"and {hash_records_deleted} related hash record{'' if hash_records_deleted == 1 else 's'} "
-                        f"for {len(device_rule_combinations)} device/rule combination{'' if len(device_rule_combinations) == 1 else 's'}."
+                        f"for {len(device_rule_combinations)} device/rule combination{'' if len(device_rule_combinations) == 1 else 's'}.",
                     )
-                    
+
                 except Exception as e:
                     messages.error(request, f"Error during deletion: {str(e)}")
-                
+
                 return redirect(self.get_return_url(request))
 
         # Show confirmation page - include feature name data for display
-        selected_hash_groups = model.objects.filter(pk__in=self.pk_list).select_related("rule__feature").annotate(
-            feature_name=F("rule__feature__name"),
-            feature_id=F("rule__feature__id"),
+        selected_hash_groups = (
+            model.objects.filter(pk__in=self.pk_list)
+            .select_related("rule__feature")
+            .annotate(
+                feature_name=F("rule__feature__name"),
+                feature_id=F("rule__feature__id"),
+            )
         )
         table = tables.ConfigHashGroupTable(selected_hash_groups)
 
@@ -916,8 +921,7 @@ class RemediateHashGroupView(PermissionRequiredMixin, View):
             # Get the config group for this feature and hash
             try:
                 config_group = models.ConfigHashGrouping.objects.get(
-                    rule__feature_id=feature_id,
-                    config_hash=config_hash
+                    rule__feature_id=feature_id, config_hash=config_hash
                 )
             except models.ConfigHashGrouping.DoesNotExist:
                 messages.warning(request, "Configuration group not found for this feature and hash")

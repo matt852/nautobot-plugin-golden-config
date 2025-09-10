@@ -601,9 +601,7 @@ class ConfigComplianceHashTable(BaseTable):
         # Get intended hash from ConfigComplianceHash records for the same device/rule
         try:
             intended_hash_record = models.ConfigComplianceHash.objects.get(
-                device=record.device, 
-                rule=record.rule, 
-                config_type="intended"
+                device=record.device, rule=record.rule, config_type="intended"
             )
             if intended_hash_record.config_hash:
                 return f"...{intended_hash_record.config_hash[-10:]}"
@@ -613,7 +611,7 @@ class ConfigComplianceHashTable(BaseTable):
 
     # actions = TemplateColumn(
     #     template_code="""
-    #     <a href="{% url 'plugins:nautobot_golden_config:configcompliancehash_delete' pk=record.pk %}" 
+    #     <a href="{% url 'plugins:nautobot_golden_config:configcompliancehash_delete' pk=record.pk %}"
     #        class="btn btn-sm btn-outline-danger" title="Delete Hash Record">
     #         <i class="mdi mdi-trash-can-outline"></i>
     #     </a>
@@ -683,7 +681,7 @@ class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     actions = TemplateColumn(
         template_code="""
         <div class="btn-group" role="group">
-            <a href="{% url 'plugins:nautobot_golden_config:configcompliance_remediate' %}?feature_id={{ record.feature_id }}&config_hash={{ record.config_hash }}" 
+            <a href="{% url 'plugins:nautobot_golden_config:configcompliance_remediate' %}?feature_id={{ record.feature_id }}&config_hash={{ record.config_hash }}"
                class="btn btn-sm btn-outline-primary" title="Generate Remediation Config Plans">
                 <i class="mdi mdi-map-check-outline"></i>
             </a>

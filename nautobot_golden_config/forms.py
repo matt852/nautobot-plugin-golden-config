@@ -651,7 +651,7 @@ class ConfigHashGroupingFilterForm(NautobotFilterForm):
         "rule__feature",
     ]
     q = django_forms.CharField(required=False, label="Search")
-    
+
 
 class ConfigComplianceHashFilterForm(DeviceRelatedFilterForm):
     """Filter Form for Config Hash Group."""

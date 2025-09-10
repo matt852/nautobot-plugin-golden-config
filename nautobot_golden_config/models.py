@@ -460,7 +460,7 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
         # Compute configuration hashes
         actual_hash = _compute_config_hash(self.actual)
         intended_hash = _compute_config_hash(self.intended)
-        
+
         # Handle actual config grouping
         if actual_hash and not self.compliance:  # Only group non-compliant configs
             # Get or create the config hash group for actual configs
@@ -469,9 +469,9 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
                 config_hash=actual_hash,
                 defaults={
                     "config_content": self.actual,
-                }
+                },
             )
-            
+
             # Create/update the hash record for actual config and link to group
             ConfigComplianceHash.objects.update_or_create(
                 device=self.device,
@@ -996,7 +996,7 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
         null=True,
         blank=True,
         help_text="Reference to the configuration hash group (only for actual configs)",
-        related_name="hash_records"
+        related_name="hash_records",
     )
 
     class Meta:
@@ -1025,22 +1025,22 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
 )
 class ConfigHashGrouping(PrimaryModel):  # pylint: disable=too-many-ancestors
     """Groups devices with identical actual configuration hashes."""
-    
+
     rule = models.ForeignKey(to="ComplianceRule", on_delete=models.CASCADE, related_name="config_hash_groups")
     config_hash = models.CharField(
         max_length=64, blank=True, help_text="SHA-256 hash of the actual configuration content", db_index=True
     )
     config_content = models.JSONField(blank=True, help_text="Actual configuration content for display purposes")
-    
+
     class Meta:
         """Set unique together fields for model."""
-        
+
         ordering = ["rule", "config_hash"]
         unique_together = ("rule", "config_hash")
         indexes = [
             models.Index(fields=["rule", "config_hash"]),
         ]
-    
+
     def __str__(self):
         """String representation of the config hash group."""
         return f"{self.rule} -> {self.config_hash[:8]}"

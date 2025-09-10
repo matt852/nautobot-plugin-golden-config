@@ -160,23 +160,19 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         """Filter ConfigCompliance records by config hash group ID."""
         if not value:
             return queryset
-        
+
         try:
             # Get the hash group
             hash_group = models.ConfigHashGrouping.objects.get(pk=value)
-            
+
             # Find all devices that are linked to this hash group via ConfigComplianceHash
             devices_in_group = models.ConfigComplianceHash.objects.filter(
-                config_group=hash_group,
-                config_type="actual"
+                config_group=hash_group, config_type="actual"
             ).values_list("device_id", flat=True)
-            
+
             # Filter ConfigCompliance records to show only these devices for this rule
-            return queryset.filter(
-                device_id__in=devices_in_group,
-                rule=hash_group.rule
-            )
-            
+            return queryset.filter(device_id__in=devices_in_group, rule=hash_group.rule)
+
         except models.ConfigHashGrouping.DoesNotExist:
             # If hash group doesn't exist, return empty queryset
             return queryset.none()
@@ -193,7 +189,7 @@ class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
 
     class Meta:
         """Meta class attributes for ConfigHashGroupingFilterSet."""
-        
+
         model = models.ConfigHashGrouping
         fields = "__all__"
 
