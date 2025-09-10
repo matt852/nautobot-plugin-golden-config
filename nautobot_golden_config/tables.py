@@ -570,16 +570,17 @@ class ConfigComplianceHashTable(BaseTable):
 
     def render_intended_config_hash(self, record):
         """Render intended config hash with only the last 10 characters."""
-        # Since this table shows actual config type records, we need to get the intended hash
-        # from the related ConfigCompliance record or return a placeholder
+        # Get intended hash from ConfigComplianceHash records for the same device/rule
         try:
-            # Try to get intended hash from ConfigCompliance
-            compliance = models.ConfigCompliance.objects.get(device=record.device, rule=record.rule)
-            intended_hash = compliance.intended_config_hash
-            if intended_hash:
-                return f"...{intended_hash[-10:]}"
+            intended_hash_record = models.ConfigComplianceHash.objects.get(
+                device=record.device, 
+                rule=record.rule, 
+                config_type="intended"
+            )
+            if intended_hash_record.config_hash:
+                return f"...{intended_hash_record.config_hash[-10:]}"
             return "--"
-        except models.ConfigCompliance.DoesNotExist:
+        except models.ConfigComplianceHash.DoesNotExist:
             return "--"
 
     class Meta(BaseTable.Meta):
@@ -604,13 +605,14 @@ class ConfigComplianceHashTable(BaseTable):
         )
 
 
-class ConfigMismatchGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
-    """Table for displaying configuration mismatch grouping results."""
+class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
+    """Table for displaying configuration hash grouping results."""
 
+    pk = ToggleColumn()
     feature_name = Column(verbose_name="Feature", accessor="feature_name")
     device_count = TemplateColumn(
         template_code="""
-        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_list' %}?feature_id={{ record.feature_id }}&actual_config_hash={{ record.config_hash }}&compliance=false"
+        <a href="{% url 'plugins:nautobot_golden_config:configcompliance_list' %}?feature_id={{ record.feature_id }}&compliance=false&config_hash_group={{ record.pk }}"
            class="text-primary" style="text-decoration: none; font-weight: bold;">
             {{ record.device_count }} device{{ record.device_count|pluralize }}
         </a>
@@ -649,16 +651,18 @@ class ConfigMismatchGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     )
 
     class Meta(BaseTable.Meta):
-        """Meta information for ConfigMismatchGroupTable."""
+        """Meta information for ConfigHashGroupTable."""
 
-        model = models.ConfigComplianceHash
+        model = models.ConfigHashGrouping
         fields = (
+            "pk",
             "feature_name",
             "device_count",
             "config_snippet",
             "actions",
         )
         default_columns = (
+            "pk",
             "feature_name",
             "device_count",
             "config_snippet",

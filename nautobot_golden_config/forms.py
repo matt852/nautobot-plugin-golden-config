@@ -642,8 +642,19 @@ class GenerateIntendedConfigForm(django_forms.Form):
             self.fields["git_repository_branch"].widget = django_forms.HiddenInput
 
 
+class ConfigHashGroupingFilterForm(NautobotFilterForm):
+    """Filter Form for Configuration Hash Grouping."""
+
+    model = models.ConfigHashGrouping
+    field_order = [
+        "q",
+        "rule__feature",
+    ]
+    q = django_forms.CharField(required=False, label="Search")
+    
+
 class ConfigComplianceHashFilterForm(DeviceRelatedFilterForm):
-    """Filter Form for Config Mismatch."""
+    """Filter Form for Config Hash Group."""
 
     model = models.ConfigComplianceHash
     field_order = [

@@ -19,8 +19,8 @@ router.register("remediation-setting", views.RemediationSettingUIViewSet)
 router.register("config-plan", views.ConfigPlanUIViewSet)
 router.register("config-compliance", views.ConfigComplianceUIViewSet)
 router.register("golden-config", views.GoldenConfigUIViewSet)
-router.register("mismatch-hash", views.ConfigComplianceHashUIViewSet)
-router.register("mismatch-grouping", views.ConfigMismatchGroupingView, basename="configmismatchgrouping")
+router.register("config-hash", views.ConfigComplianceHashUIViewSet)
+router.register("hash-grouping", views.ConfigHashGroupingViewSet)
 
 urlpatterns = [
     path("config-compliance/overview/", views.ConfigComplianceOverview.as_view(), name="configcompliance_overview"),
@@ -29,7 +29,7 @@ urlpatterns = [
     #     views.ConfigMismatchGroupingView.as_view(),
     #     name="configcompliance_mismatch_grouping",
     # ),
-    path("config-compliance/remediate/", views.RemediateMismatchGroupView.as_view(), name="configcompliance_remediate"),
+    path("config-compliance/remediate/", views.RemediateHashGroupView.as_view(), name="configcompliance_remediate"),
     path("config-plan/bulk_deploy/", views.ConfigPlanBulkDeploy.as_view(), name="configplan_bulk-deploy"),
     path("generate-intended-config/", views.GenerateIntendedConfigView.as_view(), name="generate_intended_config"),
     path("docs/", RedirectView.as_view(url=static("nautobot_golden_config/docs/index.html")), name="docs"),

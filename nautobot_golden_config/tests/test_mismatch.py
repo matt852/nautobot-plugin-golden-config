@@ -10,7 +10,7 @@ from nautobot.dcim.models import Device
 
 from nautobot_golden_config import models
 from nautobot_golden_config.tables import ConfigComplianceHashTable
-from nautobot_golden_config.views import ConfigMismatchGroupingView
+from nautobot_golden_config.views import ConfigHashGroupingViewSet
 
 from .conftest import create_device_data, create_feature_rule_json
 
@@ -327,7 +327,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
 
     def test_table_initialization(self):
         """Test that ConfigComplianceHashTable can be initialized properly."""
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Table should initialize without errors
@@ -335,7 +335,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
 
     def test_table_columns_present(self):
         """Test that all expected columns are present in the table."""
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Check that expected columns exist
@@ -345,7 +345,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
 
     def test_table_feature_name_column(self):
         """Test feature_name column rendering."""
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Get the first row
@@ -357,7 +357,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
 
     def test_table_device_count_column(self):
         """Test device_count column rendering and link generation."""
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Get the first row
@@ -372,7 +372,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         # Use existing ConfigComplianceHash records created in setUpTestData
         # The test data already has records for device1 and device2 with hash "test123hash"
 
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
@@ -391,7 +391,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
     def test_table_config_snippet_with_empty_content(self):
         """Test config_snippet column with empty configuration content."""
         # Use the existing test data from setUpTestData which should already create groups
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
@@ -411,7 +411,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
         # Use existing ConfigComplianceHash records created in setUpTestData
         # The test data already has records for device1 and device2 with hash "test123hash"
 
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML
@@ -428,7 +428,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
     def test_table_ordering(self):
         """Test that table supports proper ordering."""
         # Create table with empty queryset to test column properties
-        queryset = ConfigMismatchGroupingView().queryset.none()  # Empty queryset
+        queryset = ConfigHashGroupingViewSet().queryset.none()  # Empty queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Check that device_count column is orderable
@@ -442,7 +442,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
     def test_table_verbose_names(self):
         """Test that columns have appropriate verbose names."""
         # Create table with empty queryset to test column properties
-        queryset = ConfigMismatchGroupingView().queryset.none()  # Empty queryset
+        queryset = ConfigHashGroupingViewSet().queryset.none()  # Empty queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Check verbose names
@@ -497,7 +497,7 @@ class ConfigComplianceHashTableTestCase(TestCase):
             actual_config_hash="long789hash",
         )
 
-        queryset = ConfigMismatchGroupingView().queryset
+        queryset = ConfigHashGroupingViewSet().queryset
         table = ConfigComplianceHashTable(data=queryset)
 
         # Render the table to HTML

@@ -147,25 +147,54 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         to_field_name="slug",
         label="ComplianceFeature (slug)",
     )
-    actual_config_hash = django_filters.CharFilter(
-        field_name="actual_config_hash",
-        lookup_expr="exact",
-        label="Actual Config Hash",
-    )
-    intended_config_hash = django_filters.CharFilter(
-        field_name="intended_config_hash",
-        lookup_expr="exact",
-        label="Intended Config Hash",
-    )
     compliance = django_filters.BooleanFilter(
         field_name="compliance",
         label="Compliance Status",
     )
+    config_hash_group = django_filters.CharFilter(
+        method="filter_by_hash_group",
+        label="Config Hash Group",
+    )
+
+    def filter_by_hash_group(self, queryset, name, value):
+        """Filter ConfigCompliance records by config hash group ID."""
+        if not value:
+            return queryset
+        
+        try:
+            # Get the hash group
+            hash_group = models.ConfigHashGrouping.objects.get(pk=value)
+            
+            # Find all devices that are linked to this hash group via ConfigComplianceHash
+            devices_in_group = models.ConfigComplianceHash.objects.filter(
+                config_group=hash_group,
+                config_type="actual"
+            ).values_list("device_id", flat=True)
+            
+            # Filter ConfigCompliance records to show only these devices for this rule
+            return queryset.filter(
+                device_id__in=devices_in_group,
+                rule=hash_group.rule
+            )
+            
+        except models.ConfigHashGrouping.DoesNotExist:
+            # If hash group doesn't exist, return empty queryset
+            return queryset.none()
 
     class Meta:
         """Meta class attributes for ConfigComplianceFilter."""
 
         model = models.ConfigCompliance
+        fields = "__all__"
+
+
+class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
+    """Custom filter for configuration hash grouping that handles device filtering properly."""
+
+    class Meta:
+        """Meta class attributes for ConfigHashGroupingFilterSet."""
+        
+        model = models.ConfigHashGrouping
         fields = "__all__"
 
 
@@ -197,19 +226,24 @@ class ConfigComplianceHashFilterSet(GoldenConfigFilterSet):
         # Get the devices to filter by
         device_ids = [device.id if hasattr(device, "id") else device for device in value]
 
-        # Find ConfigCompliance records for these devices
-        compliance_records = (
-            models.ConfigCompliance.objects.filter(device_id__in=device_ids, compliance=False)
-            .values("rule", "actual_config_hash")
+        # Find ConfigComplianceHash records for these devices that correspond to non-compliant actual configs
+        hash_records = (
+            models.ConfigComplianceHash.objects.filter(
+                device_id__in=device_ids,
+                config_type="actual",
+                device__configcompliance__rule=F("rule"),
+                device__configcompliance__compliance=False,
+            )
+            .values("rule", "config_hash")
             .distinct()
         )
 
         # Build filters for rule+hash combinations
         hash_filters = Q()
         filter_count = 0
-        for record in compliance_records:
-            if record["actual_config_hash"]:
-                hash_filters |= Q(rule=record["rule"], config_hash=record["actual_config_hash"])
+        for record in hash_records:
+            if record["config_hash"]:
+                hash_filters |= Q(rule=record["rule"], config_hash=record["config_hash"])
                 filter_count += 1
 
         if hash_filters:

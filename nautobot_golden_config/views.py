@@ -645,12 +645,12 @@ class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
 
 
 class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
-    """View for configuration mismatch hashes with bulk operations."""
+    """View for configuration hashes with bulk operations."""
 
     filterset_class = filters.ConfigComplianceHashFilterSet
     filterset_form_class = forms.ConfigComplianceHashFilterForm
     table_class = tables.ConfigComplianceHashTable
-    template_name = "nautobot_golden_config/config_mismatch_grouping.html"
+    template_name = "nautobot_golden_config/config_hash_grouping.html"
 
     # Base queryset of individual ConfigComplianceHash objects
     queryset = models.ConfigComplianceHash.objects.filter(
@@ -667,7 +667,7 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
         context = super().get_extra_context(request, instance, **kwargs)  # pylint: disable=no-member
         context.update(
             {
-                "title": "Configuration Mismatch Hashes",
+                "title": "Configuration Hashes",
                 "compliance": constant.ENABLE_COMPLIANCE,
             }
         )
@@ -763,31 +763,24 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
         return Response(data)
 
 
-# class ConfigMismatchGroupingView(
-#     views.ObjectDetailViewMixin,
-#     views.ObjectDestroyViewMixin,
-#     views.ObjectBulkDestroyViewMixin,
-#     views.ObjectListViewMixin,
-# ):
-class ConfigMismatchGroupingView(views.NautobotUIViewSet):
-# class ConfigMismatchGroupingView(generic.ObjectListView):
-    """View for configuration mismatch grouping report."""
+class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
+    """View for configuration hash grouping report."""
 
-    filterset_class = filters.ConfigComplianceHashFilterSet
-    filterset_form_class = forms.ConfigComplianceHashFilterForm
-    table_class = tables.ConfigMismatchGroupTable
-    # filterset = filters.ConfigComplianceHashFilterSet
-    # filterset_form = forms.ConfigComplianceHashFilterForm
-    # table = tables.ConfigMismatchGroupTable
-    template_name = "nautobot_golden_config/config_mismatch_grouping.html"
+    filterset_class = filters.ConfigHashGroupingFilterSet
+    filterset_form_class = forms.ConfigHashGroupingFilterForm
+    table_class = tables.ConfigHashGroupTable
+    template_name = "nautobot_golden_config/config_hash_grouping.html"
+    
+    # Disable add and import actions since this is a read-only report
+    action_buttons = []
 
     queryset = (
-        models.ConfigComplianceHash.objects.filter(
-            config_type="actual", device__configcompliance__rule=F("rule"), device__configcompliance__compliance=False
-        )
-        .values("rule__feature__id", "rule__feature__name", "rule__feature__slug", "config_hash", "config_content")
-        .annotate(
-            device_count=Count("device", distinct=True),
+        models.ConfigHashGrouping.objects.annotate(
+            device_count=Count("hash_records__device", distinct=True, filter=Q(
+                hash_records__config_type="actual",
+                hash_records__device__configcompliance__rule=F("rule"),
+                hash_records__device__configcompliance__compliance=False
+            )),
             feature_id=F("rule__feature__id"),
             feature_name=F("rule__feature__name"),
             feature_slug=F("rule__feature__slug"),
@@ -801,15 +794,104 @@ class ConfigMismatchGroupingView(views.NautobotUIViewSet):
         context = super().get_extra_context(request, instance, **kwargs)  # pylint: disable=no-member
         context.update(
             {
-                "title": "Configuration Mismatch Grouping Report",
+                "title": "Configuration Hash Grouping Report",
                 "compliance": constant.ENABLE_COMPLIANCE,
             }
         )
         return context
+    
+    def perform_bulk_destroy(self, request, **kwargs):
+        """Override bulk destroy to cascade delete related ConfigComplianceHash records for each group's rule."""
+        model = self.queryset.model
+        
+        # Handle the primary key collection like the existing ConfigCompliance bulk delete
+        if request.POST.get("_all"):
+            filter_params = self.get_filter_params(request)
+            if not filter_params:
+                hash_group_objects = model.objects.only("pk").all().values_list("pk", flat=True)
+            elif self.filterset_class is None:
+                raise NotImplementedError("filterset_class must be defined to use _all")
+            else:
+                hash_group_objects = self.filterset_class(filter_params, model.objects.only("pk")).qs
+            self.pk_list = list(hash_group_objects.values_list("pk", flat=True))
+        elif "_confirm" not in request.POST:
+            # Initial selection - get the pk list from the form
+            self.pk_list = request.POST.getlist("pk")
+        else:
+            # Get the pk list from the form
+            self.pk_list = request.POST.getlist("pk")
+
+        form_class = self.get_form_class(**kwargs)
+        data = {}
+
+        if "_confirm" in request.POST:
+            form = form_class(request.POST)
+            if form.is_valid():
+                # Perform the actual deletion with cascade
+                if not self.pk_list:
+                    messages.error(request, "No hash groups selected for deletion.")
+                    return redirect(self.get_return_url(request))
+                
+                try:
+                    # Get the selected groups before deletion
+                    selected_groups = model.objects.filter(pk__in=self.pk_list).select_related("rule")
+                    
+                    # Track what we're deleting for the success message
+                    group_count = selected_groups.count()
+                    device_rule_combinations = set()
+                    
+                    # For each group, collect the rule and find all related hash records
+                    for group in selected_groups:
+                        # Find all ConfigComplianceHash records for this rule that reference this group
+                        devices_in_group = (
+                            models.ConfigComplianceHash.objects.filter(
+                                config_group=group,
+                                config_type="actual"
+                            ).values_list("device_id", flat=True)
+                        )
+                        
+                        # Add all device/rule combinations that will be affected
+                        for device_id in devices_in_group:
+                            device_rule_combinations.add((device_id, group.rule.id))
+                    
+                    # Delete both actual and intended ConfigComplianceHash records for all affected device/rule combinations
+                    hash_records_deleted = 0
+                    for device_id, rule_id in device_rule_combinations:
+                        deleted_count, _ = models.ConfigComplianceHash.objects.filter(
+                            device_id=device_id,
+                            rule_id=rule_id
+                        ).delete()
+                        hash_records_deleted += deleted_count
+                    
+                    # Now delete the hash groups themselves
+                    selected_groups.delete()
+                    
+                    messages.success(
+                        request,
+                        f"Successfully deleted {group_count} configuration hash group{'' if group_count == 1 else 's'} "
+                        f"and {hash_records_deleted} related hash record{'' if hash_records_deleted == 1 else 's'} "
+                        f"for {len(device_rule_combinations)} device/rule combination{'' if len(device_rule_combinations) == 1 else 's'}."
+                    )
+                    
+                except Exception as e:
+                    messages.error(request, f"Error during deletion: {str(e)}")
+                
+                return redirect(self.get_return_url(request))
+
+        # Show confirmation page
+        selected_hash_groups = model.objects.filter(pk__in=self.pk_list)
+        table = tables.ConfigHashGroupTable(selected_hash_groups)
+
+        if not request.POST.get("_all"):
+            data.update({"table": table, "total_objs_to_delete": len(table.rows)})
+        else:
+            data.update({"table": None, "delete_all": True, "total_objs_to_delete": len(table.rows)})
+
+        return Response(data)
 
 
-class RemediateMismatchGroupView(PermissionRequiredMixin, View):
-    """View to remediate a mismatch group by running GenerateConfigPlans job."""
+class RemediateHashGroupView(PermissionRequiredMixin, View):
+    """View to remediate a hash group by running GenerateConfigPlans job."""
 
     permission_required = ["extras.run_job"]
 
@@ -820,17 +902,26 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
 
         if not feature_id or not config_hash:
             messages.error(request, "Missing feature_id or config_hash parameters.")
-            return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+            return redirect("plugins:nautobot_golden_config:configcompliance_hash_grouping")
 
         try:
             feature = models.ComplianceFeature.objects.get(pk=feature_id)
 
-            # Get all devices in this mismatch group
+            # Get the config group for this feature and hash
+            try:
+                config_group = models.ConfigHashGrouping.objects.get(
+                    rule__feature_id=feature_id,
+                    config_hash=config_hash
+                )
+            except models.ConfigHashGrouping.DoesNotExist:
+                messages.warning(request, "Configuration group not found for this feature and hash")
+                return redirect("plugins:nautobot_golden_config:configcompliance_hash_grouping")
+
+            # Get all devices in this hash group
             devices_in_group = (
                 models.ConfigComplianceHash.objects.filter(
+                    config_group=config_group,
                     config_type="actual",
-                    rule__feature_id=feature_id,
-                    config_hash=config_hash,
                     device__configcompliance__rule__feature_id=feature_id,
                     device__configcompliance__compliance=False,
                 )
@@ -839,19 +930,14 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
             )
 
             if not devices_in_group:
-                messages.warning(request, "No devices found in mismatch group for this feature")
-                return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+                messages.warning(request, "No devices found in hash group for this feature")
+                return redirect("plugins:nautobot_golden_config:configcompliance_hash_grouping")
 
-            # Get devices with matching feature and config hash
-            compliance_records = models.ConfigCompliance.objects.filter(
-                rule__feature_id=feature_id, actual_config_hash=config_hash, compliance=False
-            )
-
-            device_ids = list(compliance_records.values_list("device_id", flat=True))
+            device_ids = list(devices_in_group)
 
             if not device_ids:
-                messages.warning(request, "No devices found for this mismatch group.")
-                return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+                messages.warning(request, "No devices found for this hash group.")
+                return redirect("plugins:nautobot_golden_config:configcompliance_hash_grouping")
 
             # Get the GenerateConfigPlans job
             job = Job.objects.get(name="Generate Config Plans")
@@ -870,4 +956,4 @@ class RemediateMismatchGroupView(PermissionRequiredMixin, View):
 
         except (Job.DoesNotExist, ValueError, TypeError, RuntimeError) as e:
             messages.error(request, f"Error starting remediation job: {str(e)}")
-            return redirect("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
+            return redirect("plugins:nautobot_golden_config:configcompliance_hash_grouping")

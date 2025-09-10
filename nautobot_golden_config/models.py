@@ -404,9 +404,6 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
     ordered = models.BooleanField(default=False)
     # Used for django-pivot, both compliance and compliance_int should be set.
     compliance_int = models.IntegerField(blank=True)
-    # Hash fields for grouping identical configurations
-    actual_config_hash = models.CharField(max_length=64, blank=True, db_index=True)
-    intended_config_hash = models.CharField(max_length=64, blank=True, db_index=True)
 
     def to_objectchange(self, action, *, related_object=None, object_data_extra=None, object_data_exclude=None):  # pylint: disable=arguments-differ
         """Remove actual and intended configuration from changelog."""
@@ -455,34 +452,56 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
         self.missing = compliance_details["missing"]
         self.extra = compliance_details["extra"]
 
-        # Compute and store configuration hashes
-        self.actual_config_hash = _compute_config_hash(self.actual)
-        self.intended_config_hash = _compute_config_hash(self.intended)
-
-        # Update or create ConfigComplianceHash records for grouping
+        # Update or create ConfigComplianceHash records and ConfigHashGrouping for grouping
         self._update_config_hashes()
 
     def _update_config_hashes(self):
-        """Update or create ConfigComplianceHash records for actual and intended configs."""
-        # Update or create hash record for actual config
-        ConfigComplianceHash.objects.update_or_create(
-            device=self.device,
-            rule=self.rule,
-            config_type="actual",
-            defaults={
-                "config_hash": self.actual_config_hash,
-                "config_content": self.actual,
-            },
-        )
+        """Update or create ConfigComplianceHash records and ConfigHashGrouping for actual and intended configs."""
+        # Compute configuration hashes
+        actual_hash = _compute_config_hash(self.actual)
+        intended_hash = _compute_config_hash(self.intended)
+        
+        # Handle actual config grouping
+        if actual_hash and not self.compliance:  # Only group non-compliant configs
+            # Get or create the config hash group for actual configs
+            config_group, _ = ConfigHashGrouping.objects.get_or_create(
+                rule=self.rule,
+                config_hash=actual_hash,
+                defaults={
+                    "config_content": self.actual,
+                }
+            )
+            
+            # Create/update the hash record for actual config and link to group
+            ConfigComplianceHash.objects.update_or_create(
+                device=self.device,
+                rule=self.rule,
+                config_type="actual",
+                defaults={
+                    "config_hash": actual_hash,
+                    "config_group": config_group,
+                },
+            )
+        else:
+            # Create/update hash record for actual config without group (compliant or empty)
+            ConfigComplianceHash.objects.update_or_create(
+                device=self.device,
+                rule=self.rule,
+                config_type="actual",
+                defaults={
+                    "config_hash": actual_hash,
+                    "config_group": None,
+                },
+            )
 
-        # Update or create hash record for intended config
+        # Create/update hash record for intended config (no grouping needed for intended)
         ConfigComplianceHash.objects.update_or_create(
             device=self.device,
             rule=self.rule,
             config_type="intended",
             defaults={
-                "config_hash": self.intended_config_hash,
-                "config_content": self.intended,
+                "config_hash": intended_hash,
+                "config_group": None,  # Intended configs don't get grouped
             },
         )
 
@@ -520,8 +539,6 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
                     "missing",
                     "extra",
                     "remediation",
-                    "actual_config_hash",
-                    "intended_config_hash",
                 }
             )
 
@@ -961,7 +978,7 @@ class ConfigPlan(PrimaryModel):  # pylint: disable=too-many-ancestors
     "webhooks",
 )
 class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
-    """Configuration compliance hash storage for grouping identical configurations."""
+    """Configuration compliance hash storage for linking devices to configuration hash groups."""
 
     device = models.ForeignKey(to="dcim.Device", on_delete=models.CASCADE, help_text="The device")
     rule = models.ForeignKey(to="ComplianceRule", on_delete=models.CASCADE, related_name="config_hashes")
@@ -973,7 +990,14 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
     config_hash = models.CharField(
         max_length=64, blank=True, help_text="SHA-256 hash of the configuration content", db_index=True
     )
-    config_content = models.JSONField(blank=True, help_text="Configuration content for display purposes")
+    config_group = models.ForeignKey(
+        to="ConfigHashGrouping",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Reference to the configuration hash group (only for actual configs)",
+        related_name="hash_records"
+    )
 
     class Meta:
         """Set unique together fields for model."""
@@ -988,3 +1012,35 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
     def __str__(self):
         """String representation of the hash record."""
         return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash[:8]}"
+
+
+@extras_features(
+    "custom_fields",
+    "custom_links",
+    "custom_validators",
+    "export_templates",
+    "graphql",
+    "relationships",
+    "webhooks",
+)
+class ConfigHashGrouping(PrimaryModel):  # pylint: disable=too-many-ancestors
+    """Groups devices with identical actual configuration hashes."""
+    
+    rule = models.ForeignKey(to="ComplianceRule", on_delete=models.CASCADE, related_name="config_hash_groups")
+    config_hash = models.CharField(
+        max_length=64, blank=True, help_text="SHA-256 hash of the actual configuration content", db_index=True
+    )
+    config_content = models.JSONField(blank=True, help_text="Actual configuration content for display purposes")
+    
+    class Meta:
+        """Set unique together fields for model."""
+        
+        ordering = ["rule", "config_hash"]
+        unique_together = ("rule", "config_hash")
+        indexes = [
+            models.Index(fields=["rule", "config_hash"]),
+        ]
+    
+    def __str__(self):
+        """String representation of the config hash group."""
+        return f"{self.rule} -> {self.config_hash[:8]}"
