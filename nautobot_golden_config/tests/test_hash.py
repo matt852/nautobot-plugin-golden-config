@@ -356,4 +356,4 @@ class ConfigMismatchHashViewSetTestCase(TestCase):
     def test_viewset_template_name(self):
         """Test that the viewset uses the correct template."""
         viewset = ConfigComplianceHashUIViewSet()
-        self.assertEqual(viewset.template_name, "nautobot_golden_config/config_mismatch_grouping.html")
+        self.assertEqual(viewset.template_name, "nautobot_golden_config/config_hash_grouping.html")

@@ -118,7 +118,7 @@ class ConfigMismatchGroupingViewTestCase(TestCase):
         """Test that the correct template is used."""
         url = reverse("plugins:nautobot_golden_config:configcompliance_mismatch_grouping")
         response = self.client.get(url)
-        self.assertTemplateUsed(response, "nautobot_golden_config/config_mismatch_grouping.html")
+        self.assertTemplateUsed(response, "nautobot_golden_config/config_hash_grouping.html")
 
     def test_mismatch_grouping_view_context_data(self):
         """Test that the view provides correct context data."""
