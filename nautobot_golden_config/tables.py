@@ -132,6 +132,34 @@ def actual_fields():
     return tuple(active_fields)
 
 
+def get_display_template(field_name):
+    """Return a display template for the given field name."""
+    return (
+        """
+        {% load helpers %}
+        <pre><code><div title="Click to copy to clipboard" """
+        "onClick=\"toClipboard('{{ record.id }}" + field_name + '\')" id="{{ record.id }}' + field_name + '"'
+        """style="height:auto;max-height:50vh;line-height:1.5em;white-space:pre-wrap;word-break:break-all;overflow:auto;">{{ value }}</div></code></pre>
+        <script>
+            function toClipboard(id) {
+                const element = document.getElementById(id);
+                const content = element.innerText || element.textContent;
+                navigator.clipboard.writeText(content).then(() => {
+                    console.log("Copied to clipboard");
+                }).catch(err => {
+                    console.error("Failed to copy: ", err);
+                    alert("Error copying to clipboard.");
+                });
+
+                // Improve alert message to be less intrusive or more informative
+                const displayContent = content.length > 100 ? content.slice(0, 100) + "..." : content;
+                alert("Copied to clipboard: " + displayContent);
+            }
+        </script>
+    """
+    )
+
+
 #
 # Columns
 #
@@ -621,22 +649,23 @@ class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
         orderable=True,
         order_by=("device_count",),
     )
-    config_snippet = TemplateColumn(
-        template_code="""
-        <div style="width: 300px;">
-            <div class="config-toggle" style="cursor: pointer; padding: 8px 0;">
-                <span>View Config</span>
-                <i class="mdi mdi-chevron-down config-chevron" style="margin-left: 5px; display: inline-block;"></i>
-            </div>
-            <div class="config-content" style="display: none;">
-                {% if record.config_content %}
-                    <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; margin: 0; white-space: pre-wrap;">{{ record.config_content|truncatechars:500 }}</pre>
-                {% else %}
-                    <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; text-align: center; color: #6c757d; margin: 0;">--</pre>
-                {% endif %}
-            </div>
-        </div>
-        """,
+    config_content = TemplateColumn(
+        template_code=get_display_template("config_content"),
+        # template_code="""
+        # <div style="width: 300px;">
+        #     <div class="config-toggle" style="cursor: pointer; padding: 8px 0;">
+        #         <span>View Config</span>
+        #         <i class="mdi mdi-chevron-down config-chevron" style="margin-left: 5px; display: inline-block;"></i>
+        #     </div>
+        #     <div class="config-content" style="display: none;">
+        #         {% if record.config_content %}
+        #             <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; margin: 0; white-space: pre-wrap;">{{ record.config_content|truncatechars:500 }}</pre>
+        #         {% else %}
+        #             <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; text-align: center; color: #6c757d; margin: 0;">--</pre>
+        #         {% endif %}
+        #     </div>
+        # </div>
+        # """,
         verbose_name="Configuration Snippet",
         orderable=False,
     )
@@ -658,13 +687,13 @@ class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
             "pk",
             "feature_name",
             "device_count",
-            "config_snippet",
+            "config_content",
             "actions",
         )
         default_columns = (
             "pk",
             "feature_name",
             "device_count",
-            "config_snippet",
+            "config_content",
             "actions",
         )
