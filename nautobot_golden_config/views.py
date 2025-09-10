@@ -763,13 +763,22 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
         return Response(data)
 
 
-class ConfigMismatchGroupingView(generic.ObjectListView):
+# class ConfigMismatchGroupingView(
+#     views.ObjectDetailViewMixin,
+#     views.ObjectDestroyViewMixin,
+#     views.ObjectBulkDestroyViewMixin,
+#     views.ObjectListViewMixin,
+# ):
+class ConfigMismatchGroupingView(views.NautobotUIViewSet):
+# class ConfigMismatchGroupingView(generic.ObjectListView):
     """View for configuration mismatch grouping report."""
 
-    action_buttons = ("export",)
-    filterset = filters.ConfigComplianceHashFilterSet
-    filterset_form = forms.ConfigComplianceHashFilterForm
-    table = tables.ConfigMismatchGroupTable
+    filterset_class = filters.ConfigComplianceHashFilterSet
+    filterset_form_class = forms.ConfigComplianceHashFilterForm
+    table_class = tables.ConfigMismatchGroupTable
+    # filterset = filters.ConfigComplianceHashFilterSet
+    # filterset_form = forms.ConfigComplianceHashFilterForm
+    # table = tables.ConfigMismatchGroupTable
     template_name = "nautobot_golden_config/config_mismatch_grouping.html"
 
     queryset = (

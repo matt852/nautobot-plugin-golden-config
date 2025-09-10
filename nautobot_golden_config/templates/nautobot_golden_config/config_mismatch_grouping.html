@@ -6,7 +6,7 @@
 {% block title %}Configuration Mismatch Grouping Report{% endblock %}
 
 {% block breadcrumbs %}
-<li><a href="{% url 'plugins:nautobot_golden_config:configcompliance_mismatch_grouping' %}">Configuration Mismatch Grouping</a></li>
+<li><a href="{% url 'plugins:nautobot_golden_config:configmismatchgrouping' %}">Configuration Mismatch Grouping</a></li>
 {% block extra_breadcrumbs %}{% endblock extra_breadcrumbs %}
 {% endblock breadcrumbs %}
 
@@ -70,70 +70,101 @@ var nautobot_csrf_token = "{{ csrf_token }}";
 
 // Add vanilla JavaScript for config snippets
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Config mismatch grouping JavaScript loading...');
+    
     // Handle config toggle clicks with direct event listeners
     function setupToggle(toggle) {
+        console.log('Setting up toggle for element:', toggle);
         toggle.addEventListener('click', function(e) {
+            console.log('Toggle clicked:', this);
             e.preventDefault();
             const content = this.nextElementSibling;
             const chevron = this.querySelector('i.config-chevron');
             
+            console.log('Content element:', content);
+            console.log('Chevron element:', chevron);
+            
             if (chevron && content) {
                 const isHidden = content.style.display === 'none';
+                console.log('Is content hidden?', isHidden);
                 content.style.display = isHidden ? 'block' : 'none';
                 chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+                console.log('Set content display to:', content.style.display);
+                console.log('Set chevron transform to:', chevron.style.transform);
+            } else {
+                console.log('Missing chevron or content element!');
             }
         });
     }
     
     // Set up all toggles
     const toggles = document.querySelectorAll('.config-toggle');
+    console.log('Found config toggles:', toggles.length);
     
-    toggles.forEach(function(toggle) {
+    toggles.forEach(function(toggle, index) {
+        console.log('Setting up toggle', index + 1, 'of', toggles.length, ':', toggle);
         setupToggle(toggle);
         
         // Auto-expand all config snippets for better UX
         const content = toggle.nextElementSibling;
         const chevron = toggle.querySelector('i.config-chevron');
+        console.log('Auto-expanding toggle', index + 1, '- content:', content, 'chevron:', chevron);
         if (content && chevron) {
             content.style.display = 'block';
             chevron.style.transform = 'rotate(180deg)';
+            console.log('Auto-expanded toggle', index + 1);
+        } else {
+            console.log('Could not auto-expand toggle', index + 1, '- missing elements');
         }
     });
     
     // Toggle all functionality
     const toggleAll = document.querySelector('.toggle-all');
+    console.log('Toggle all element found:', toggleAll);
     if (toggleAll) {
         let allExpanded = true; // Start with all expanded
         
         toggleAll.addEventListener('click', function(e) {
+            console.log('Toggle all clicked');
             e.preventDefault();
             
             // Toggle all config sections
-            toggles.forEach(function(toggle) {
+            toggles.forEach(function(toggle, index) {
                 const content = toggle.nextElementSibling;
                 const chevron = toggle.querySelector('i.config-chevron');
                 
+                console.log('Toggle all - processing toggle', index + 1);
                 if (content && chevron) {
                     if (allExpanded) {
                         // Collapse all
                         content.style.display = 'none';
                         chevron.style.transform = 'rotate(0deg)';
+                        console.log('Collapsed toggle', index + 1);
                     } else {
                         // Expand all
                         content.style.display = 'block';
                         chevron.style.transform = 'rotate(180deg)';
+                        console.log('Expanded toggle', index + 1);
                     }
+                } else {
+                    console.log('Could not process toggle', index + 1, '- missing elements');
                 }
             });
             
             // Update toggle all state
             allExpanded = !allExpanded;
             toggleAll.style.transform = allExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+            console.log('Toggle all state changed to:', allExpanded ? 'expanded' : 'collapsed');
         });
         
         // Initialize toggle all to expanded state
         toggleAll.style.transform = 'rotate(180deg)';
+        console.log('Initialize toggle all to expanded state');
+    } else {
+        console.log('Toggle all element not found');
     }
+    
+    console.log('Config mismatch grouping JavaScript setup complete');
 });
 
 // Function to count config plans generated for this specific job

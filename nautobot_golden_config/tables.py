@@ -592,6 +592,7 @@ class ConfigComplianceHashTable(BaseTable):
             "rule",
             "actual_config_hash",
             "intended_config_hash",
+            "actions",
         )
         default_columns = (
             "pk",
@@ -599,6 +600,7 @@ class ConfigComplianceHashTable(BaseTable):
             "rule",
             "actual_config_hash",
             "intended_config_hash",
+            "actions",
         )
 
 
@@ -647,7 +649,7 @@ class ConfigMismatchGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     )
 
     class Meta(BaseTable.Meta):
-        """Meta information for ConfigMismatchHashTable."""
+        """Meta information for ConfigMismatchGroupTable."""
 
         model = models.ConfigComplianceHash
         fields = (
