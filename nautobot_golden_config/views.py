@@ -650,6 +650,7 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     filterset_class = filters.ConfigComplianceHashFilterSet
     filterset_form_class = forms.ConfigComplianceHashFilterForm
     table_class = tables.ConfigComplianceHashTable
+    serializer_class = serializers.ConfigComplianceHashSerializer
 
     # Base queryset of individual ConfigComplianceHash objects
     # Show actual config hashes where there's a corresponding non-compliant ConfigCompliance record
@@ -780,6 +781,7 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
     filterset_class = filters.ConfigHashGroupingFilterSet
     filterset_form_class = forms.ConfigHashGroupingFilterForm
     table_class = tables.ConfigHashGroupingTable
+    serializer_class = serializers.ConfigHashGroupingSerializer
 
     # Disable add and import actions since this is a read-only report
     action_buttons = []
