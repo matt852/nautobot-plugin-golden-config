@@ -119,6 +119,15 @@ class ConfigMismatchHashViewSetTestCase(TestCase):
         # Verify our test data is included - check that device1 with feature1 appears in the queryset
         device1_hashes = queryset.filter(device=self.device1, rule=self.feature1)
         self.assertEqual(device1_hashes.count(), 1, "Device1 with feature1 should appear exactly once in the queryset")
+        
+        # Verify the queryset excludes "intended" config types - check that no intended records appear
+        all_hash_records = models.ConfigComplianceHash.objects.filter(
+            device=self.device1, rule=self.feature1
+        )
+        intended_count = all_hash_records.filter(config_type="intended").count()
+        self.assertGreater(intended_count, 0, "Should have intended records in the database")
+        queryset_intended_count = queryset.filter(device=self.device1, rule=self.feature1, config_type="intended").count()
+        self.assertEqual(queryset_intended_count, 0, "Queryset should exclude intended config types")
 
     def test_get_extra_context(self):
         """Test that get_extra_context returns correct context data."""
