@@ -9,7 +9,7 @@ from nautobot.dcim.models import Device
 from nautobot_golden_config import models
 from nautobot_golden_config.filters import ConfigHashGroupingFilterSet
 from nautobot_golden_config.forms import ConfigHashGroupingFilterForm
-from nautobot_golden_config.tables import ConfigHashGroupTable
+from nautobot_golden_config.tables import ConfigHashGroupingTable
 from nautobot_golden_config.views import ConfigHashGroupingViewSet
 
 from .conftest import create_device_data, create_feature_rule_json
@@ -237,7 +237,7 @@ class ConfigHashGroupingViewTestCase(TestCase):
     def test_viewset_table_class(self):
         """Test that viewset uses correct table class."""
         viewset = ConfigHashGroupingViewSet()
-        self.assertEqual(viewset.table_class, ConfigHashGroupTable)
+        self.assertEqual(viewset.table_class, ConfigHashGroupingTable)
 
     def test_viewset_filterset_classes(self):
         """Test that viewset uses correct filterset classes."""
@@ -252,8 +252,8 @@ class ConfigHashGroupingViewTestCase(TestCase):
 
 
 @override_settings(EXEMPT_VIEW_PERMISSIONS=["*"])
-class ConfigHashGroupTableTestCase(TestCase):
-    """Test ConfigHashGroupTable functionality."""
+class ConfigHashGroupingTableTestCase(TestCase):
+    """Test ConfigHashGroupingTable functionality."""
 
     @classmethod
     def setUpTestData(cls):
@@ -314,17 +314,17 @@ class ConfigHashGroupTableTestCase(TestCase):
         )
 
     def test_table_initialization(self):
-        """Test that ConfigHashGroupTable can be initialized properly."""
+        """Test that ConfigHashGroupingTable can be initialized properly."""
         queryset = ConfigHashGroupingViewSet().queryset
-        table = ConfigHashGroupTable(data=queryset)
+        table = ConfigHashGroupingTable(data=queryset)
 
         # Table should initialize without errors
-        self.assertIsInstance(table, ConfigHashGroupTable)
+        self.assertIsInstance(table, ConfigHashGroupingTable)
 
     def test_table_columns_present(self):
         """Test that all expected columns are present in the table."""
         queryset = ConfigHashGroupingViewSet().queryset
-        table = ConfigHashGroupTable(data=queryset)
+        table = ConfigHashGroupingTable(data=queryset)
 
         # Check that expected columns exist
         expected_columns = ["pk", "feature_name", "device_count", "config_content", "actions"]
@@ -335,7 +335,7 @@ class ConfigHashGroupTableTestCase(TestCase):
         """Test table Meta configuration."""
         # Use empty queryset for table initialization
         empty_data = models.ConfigHashGrouping.objects.none()
-        table = ConfigHashGroupTable(data=empty_data)
+        table = ConfigHashGroupingTable(data=empty_data)
 
         # Check model
         self.assertEqual(table.Meta.model, models.ConfigHashGrouping)
@@ -348,7 +348,7 @@ class ConfigHashGroupTableTestCase(TestCase):
     def test_table_actions_column_template(self):
         """Test that actions column contains expected remediation links."""
         # Get the actions column template from the table class definition
-        table_class = ConfigHashGroupTable
+        table_class = ConfigHashGroupingTable
         actions_column = table_class.base_columns["actions"]
         template_code = actions_column.template_code
 
@@ -360,7 +360,7 @@ class ConfigHashGroupTableTestCase(TestCase):
     def test_table_device_count_column_template(self):
         """Test device count column template for filtering links."""
         # Get the device_count column template from the table class definition
-        table_class = ConfigHashGroupTable
+        table_class = ConfigHashGroupingTable
         device_count_column = table_class.base_columns["device_count"]
         template_code = device_count_column.template_code
 
@@ -372,7 +372,7 @@ class ConfigHashGroupTableTestCase(TestCase):
     def test_table_config_content_column_template(self):
         """Test config content column template structure."""
         # Get the config_content column template from the table class definition
-        table_class = ConfigHashGroupTable
+        table_class = ConfigHashGroupingTable
         config_content_column = table_class.base_columns["config_content"]
         template_code = config_content_column.template_code
 

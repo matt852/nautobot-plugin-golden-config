@@ -650,7 +650,6 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     filterset_class = filters.ConfigComplianceHashFilterSet
     filterset_form_class = forms.ConfigComplianceHashFilterForm
     table_class = tables.ConfigComplianceHashTable
-    template_name = "nautobot_golden_config/config_hash_grouping.html"
 
     # Base queryset of individual ConfigComplianceHash objects
     # Show actual config hashes where there's a corresponding non-compliant ConfigCompliance record
@@ -780,8 +779,7 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
 
     filterset_class = filters.ConfigHashGroupingFilterSet
     filterset_form_class = forms.ConfigHashGroupingFilterForm
-    table_class = tables.ConfigHashGroupTable
-    template_name = "nautobot_golden_config/config_hash_grouping.html"
+    table_class = tables.ConfigHashGroupingTable
 
     # Disable add and import actions since this is a read-only report
     action_buttons = []
@@ -896,7 +894,7 @@ class ConfigHashGroupingViewSet(views.NautobotUIViewSet):
                 feature_id=F("rule__feature__id"),
             )
         )
-        table = tables.ConfigHashGroupTable(selected_hash_groups)
+        table = tables.ConfigHashGroupingTable(selected_hash_groups)
 
         if not request.POST.get("_all"):
             data.update({"table": table, "total_objs_to_delete": len(table.rows)})

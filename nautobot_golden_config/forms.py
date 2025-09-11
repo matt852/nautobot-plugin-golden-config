@@ -642,15 +642,20 @@ class GenerateIntendedConfigForm(django_forms.Form):
             self.fields["git_repository_branch"].widget = django_forms.HiddenInput
 
 
-class ConfigHashGroupingFilterForm(NautobotFilterForm):
+class ConfigHashGroupingFilterForm(django_forms.Form):
     """Filter Form for Configuration Hash Grouping."""
 
     model = models.ConfigHashGrouping
-    field_order = [
-        "q",
-        "rule__feature",
-    ]
+
     q = django_forms.CharField(required=False, label="Search")
+    
+    feature = forms.DynamicModelMultipleChoiceField(
+        queryset=models.ComplianceFeature.objects.all(),
+        required=False,
+        label="Feature",
+        to_field_name="name",
+    )
+    device = forms.DynamicModelMultipleChoiceField(queryset=Device.objects.all(), required=False)
 
 
 class ConfigComplianceHashFilterForm(DeviceRelatedFilterForm):

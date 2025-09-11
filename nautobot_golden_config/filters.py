@@ -187,6 +187,41 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
 class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
     """Custom filter for configuration hash grouping that handles device filtering properly."""
 
+    feature = django_filters.ModelMultipleChoiceFilter(
+        field_name="rule__feature__name",
+        queryset=models.ComplianceFeature.objects.all(),
+        to_field_name="name",
+        label="Feature",
+    )
+    
+    device = NaturalKeyOrPKMultipleChoiceFilter(
+        queryset=Device.objects.all(),
+        to_field_name="name",
+        label="Device (name or ID)",
+        method="filter_by_device",
+    )
+
+    def filter_by_device(self, queryset, name, value):  # pylint: disable=unused-argument
+        """Filter ConfigHashGrouping records by devices that are members of the groups."""
+        if not value:
+            return queryset
+        
+        # Get device IDs from the filter value
+        device_ids = []
+        for device in value:
+            if hasattr(device, 'id'):
+                device_ids.append(device.id)
+            else:
+                device_ids.append(device)
+        
+        # Find all ConfigHashGrouping IDs where these devices have corresponding ConfigComplianceHash records
+        hash_group_ids = models.ConfigComplianceHash.objects.filter(
+            device_id__in=device_ids,
+            config_group__isnull=False
+        ).values_list('config_group_id', flat=True).distinct()
+        
+        return queryset.filter(id__in=hash_group_ids)
+
     class Meta:
         """Meta class attributes for ConfigHashGroupingFilterSet."""
 

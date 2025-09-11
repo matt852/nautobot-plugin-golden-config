@@ -1011,7 +1011,7 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
 
     def __str__(self):
         """String representation of the hash record."""
-        return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash[:8]}"
+        return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash[-10:]}"
 
 
 @extras_features(
@@ -1043,4 +1043,4 @@ class ConfigHashGrouping(PrimaryModel):  # pylint: disable=too-many-ancestors
 
     def __str__(self):
         """String representation of the config hash group."""
-        return f"{self.rule} -> {self.config_hash[:8]}"
+        return f"{self.rule} -> {self.config_hash[-10:]}"

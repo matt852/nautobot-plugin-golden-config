@@ -593,32 +593,21 @@ class ConfigComplianceHashTable(BaseTable):
     def render_actual_config_hash(self, value):
         """Render actual config hash with only the last 10 characters."""
         if value:
-            return f"...{value[-10:]}"
+            return value
         return value
 
     def render_intended_config_hash(self, record):
-        """Render intended config hash with only the last 10 characters."""
+        """Render intended config hash."""
         # Get intended hash from ConfigComplianceHash records for the same device/rule
         try:
             intended_hash_record = models.ConfigComplianceHash.objects.get(
                 device=record.device, rule=record.rule, config_type="intended"
             )
             if intended_hash_record.config_hash:
-                return f"...{intended_hash_record.config_hash[-10:]}"
+                return intended_hash_record.config_hash
             return "--"
         except models.ConfigComplianceHash.DoesNotExist:
             return "--"
-
-    # actions = TemplateColumn(
-    #     template_code="""
-    #     <a href="{% url 'plugins:nautobot_golden_config:configcompliancehash_delete' pk=record.pk %}"
-    #        class="btn btn-sm btn-outline-danger" title="Delete Hash Record">
-    #         <i class="mdi mdi-trash-can-outline"></i>
-    #     </a>
-    #     """,
-    #     verbose_name="Actions",
-    #     orderable=False,
-    # )
 
     class Meta(BaseTable.Meta):
         """Meta information for ConfigComplianceHashTable."""
@@ -630,7 +619,6 @@ class ConfigComplianceHashTable(BaseTable):
             "rule",
             "actual_config_hash",
             "intended_config_hash",
-            # "actions",
         )
         default_columns = (
             "pk",
@@ -638,11 +626,10 @@ class ConfigComplianceHashTable(BaseTable):
             "rule",
             "actual_config_hash",
             "intended_config_hash",
-            # "actions",
         )
 
 
-class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
+class ConfigHashGroupingTable(BaseTable):  # pylint: disable=nb-sub-class-name
     """Table for displaying configuration hash grouping results."""
 
     pk = ToggleColumn()
@@ -660,21 +647,6 @@ class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     )
     config_content = TemplateColumn(
         template_code=get_display_template("config_content"),
-        # template_code="""
-        # <div style="width: 300px;">
-        #     <div class="config-toggle" style="cursor: pointer; padding: 8px 0;">
-        #         <span>View Config</span>
-        #         <i class="mdi mdi-chevron-down config-chevron" style="margin-left: 5px; display: inline-block;"></i>
-        #     </div>
-        #     <div class="config-content" style="display: none;">
-        #         {% if record.config_content %}
-        #             <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; margin: 0; white-space: pre-wrap;">{{ record.config_content|truncatechars:500 }}</pre>
-        #         {% else %}
-        #             <pre style="max-height: 200px; overflow-y: auto; font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; text-align: center; color: #6c757d; margin: 0;">--</pre>
-        #         {% endif %}
-        #     </div>
-        # </div>
-        # """,
         verbose_name="Configuration Snippet",
         orderable=False,
     )
@@ -692,7 +664,7 @@ class ConfigHashGroupTable(BaseTable):  # pylint: disable=nb-sub-class-name
     )
 
     class Meta(BaseTable.Meta):
-        """Meta information for ConfigHashGroupTable."""
+        """Meta information for ConfigHashGroupingTable."""
 
         model = models.ConfigHashGrouping
         fields = (
