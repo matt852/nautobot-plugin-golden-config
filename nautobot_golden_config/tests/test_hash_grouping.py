@@ -203,7 +203,7 @@ class ConfigHashGroupingViewTestCase(TestCase):
 
     def test_viewset_url_access(self):
         """Test that the hash grouping URL is accessible."""
-        url = reverse("plugins:nautobot_golden_config:confighashgrouping-list")
+        url = reverse("plugins:nautobot_golden_config:confighashgrouping_list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
@@ -333,7 +333,9 @@ class ConfigHashGroupTableTestCase(TestCase):
 
     def test_table_meta_configuration(self):
         """Test table Meta configuration."""
-        table = ConfigHashGroupTable()
+        # Use empty queryset for table initialization
+        empty_data = models.ConfigHashGrouping.objects.none()
+        table = ConfigHashGroupTable(data=empty_data)
 
         # Check model
         self.assertEqual(table.Meta.model, models.ConfigHashGrouping)
@@ -345,11 +347,9 @@ class ConfigHashGroupTableTestCase(TestCase):
 
     def test_table_actions_column_template(self):
         """Test that actions column contains expected remediation links."""
-        queryset = ConfigHashGroupingViewSet().queryset
-        table = ConfigHashGroupTable(data=queryset)
-
-        # Get the actions column template
-        actions_column = table.columns["actions"]
+        # Get the actions column template from the table class definition
+        table_class = ConfigHashGroupTable
+        actions_column = table_class.base_columns["actions"]
         template_code = actions_column.template_code
 
         # Check for expected URL pattern and icon
@@ -359,11 +359,9 @@ class ConfigHashGroupTableTestCase(TestCase):
 
     def test_table_device_count_column_template(self):
         """Test device count column template for filtering links."""
-        queryset = ConfigHashGroupingViewSet().queryset
-        table = ConfigHashGroupTable(data=queryset)
-
-        # Get the device_count column template
-        device_count_column = table.columns["device_count"]
+        # Get the device_count column template from the table class definition
+        table_class = ConfigHashGroupTable
+        device_count_column = table_class.base_columns["device_count"]
         template_code = device_count_column.template_code
 
         # Check for filtering URL with parameters
@@ -373,16 +371,15 @@ class ConfigHashGroupTableTestCase(TestCase):
 
     def test_table_config_content_column_template(self):
         """Test config content column template structure."""
-        table = ConfigHashGroupTable()
-
-        # Get the config_content column template
-        config_content_column = table.columns["config_content"]
+        # Get the config_content column template from the table class definition
+        table_class = ConfigHashGroupTable
+        config_content_column = table_class.base_columns["config_content"]
         template_code = config_content_column.template_code
 
-        # Check for AJAX expansion functionality
-        self.assertIn("config-preview", template_code)
-        self.assertIn("expand-config-btn", template_code)
-        self.assertIn("Show Full Config", template_code)
+        # Check for clipboard functionality in the display template
+        self.assertIn("toClipboard", template_code)
+        self.assertIn("Click to copy to clipboard", template_code)
+        self.assertIn("helpers", template_code)
 
 
 @override_settings(EXEMPT_VIEW_PERMISSIONS=["*"])
@@ -521,7 +518,7 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
         )
 
         # Test the view response
-        url = reverse("plugins:nautobot_golden_config:confighashgrouping-list")
+        url = reverse("plugins:nautobot_golden_config:confighashgrouping_list")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)

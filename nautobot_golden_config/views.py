@@ -8,7 +8,7 @@ import yaml
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import CharField, Count, ExpressionWrapper, F, FloatField, Max, Q, Value
+from django.db.models import CharField, Count, Exists, ExpressionWrapper, F, FloatField, Max, OuterRef, Q, Value
 from django.db.models.functions import Cast, Concat
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -653,11 +653,19 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     template_name = "nautobot_golden_config/config_hash_grouping.html"
 
     # Base queryset of individual ConfigComplianceHash objects
-    # Show actual config hashes where there's a corresponding ConfigCompliance record
+    # Show actual config hashes where there's a corresponding non-compliant ConfigCompliance record
     queryset = (
         models.ConfigComplianceHash.objects.filter(config_type="actual")
         .select_related("device", "rule__feature")
-        .filter(device__configcompliance__rule=F("rule"))
+        .filter(
+            Exists(
+                models.ConfigCompliance.objects.filter(
+                    device=OuterRef('device'),
+                    rule=OuterRef('rule'),
+                    compliance=False
+                )
+            )
+        )
         .distinct()
     )
 
