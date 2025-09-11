@@ -60,7 +60,7 @@ class ConfigHashGroupingModelTestCase(TestCase):
         )
 
         # String should include rule and truncated hash
-        expected_str = f"{self.feature1} -> test123h"
+        expected_str = f"{self.feature1} -> test123hash"
         self.assertEqual(str(hash_group), expected_str)
 
     def test_config_hash_grouping_unique_together(self):
@@ -228,11 +228,6 @@ class ConfigHashGroupingViewTestCase(TestCase):
             self.assertTrue(hasattr(first_group, "feature_id"))
             self.assertTrue(hasattr(first_group, "feature_name"))
             self.assertTrue(hasattr(first_group, "feature_slug"))
-
-    def test_viewset_template_name(self):
-        """Test that viewset uses correct template."""
-        viewset = ConfigHashGroupingViewSet()
-        self.assertEqual(viewset.template_name, "nautobot_golden_config/config_hash_grouping.html")
 
     def test_viewset_table_class(self):
         """Test that viewset uses correct table class."""

@@ -648,7 +648,7 @@ class ConfigHashGroupingFilterForm(django_forms.Form):
     model = models.ConfigHashGrouping
 
     q = django_forms.CharField(required=False, label="Search")
-    
+
     feature = forms.DynamicModelMultipleChoiceField(
         queryset=models.ComplianceFeature.objects.all(),
         required=False,

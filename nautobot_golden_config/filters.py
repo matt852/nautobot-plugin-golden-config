@@ -193,7 +193,7 @@ class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
         to_field_name="name",
         label="Feature",
     )
-    
+
     device = NaturalKeyOrPKMultipleChoiceFilter(
         queryset=Device.objects.all(),
         to_field_name="name",
@@ -205,7 +205,7 @@ class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
         """Filter ConfigHashGrouping records by devices that are members of the groups."""
         if not value:
             return queryset
-        
+
         # Get device IDs from the filter value
         device_ids = []
         for device in value:
@@ -213,13 +213,13 @@ class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
                 device_ids.append(device.id)
             else:
                 device_ids.append(device)
-        
+
         # Find all ConfigHashGrouping IDs where these devices have corresponding ConfigComplianceHash records
         hash_group_ids = models.ConfigComplianceHash.objects.filter(
             device_id__in=device_ids,
             config_group__isnull=False
         ).values_list('config_group_id', flat=True).distinct()
-        
+
         return queryset.filter(id__in=hash_group_ids)
 
     class Meta:
