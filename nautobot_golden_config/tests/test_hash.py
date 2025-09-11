@@ -102,24 +102,24 @@ class ConfigMismatchHashViewSetTestCase(TestCase):
 
         # Basic test: just verify the queryset returns some records
         self.assertGreater(queryset.count(), 0, "Queryset should return some records")
-        
+
         # Verify all records are "actual" config type (not "intended")
         config_types = set(queryset.values_list('config_type', flat=True))
         self.assertEqual(config_types, {'actual'}, "Queryset should only contain 'actual' config type records")
-        
+
         # Verify all hash records correspond to non-compliant ConfigCompliance records
         for hash_record in queryset:
             compliance_record = models.ConfigCompliance.objects.get(
-                device=hash_record.device, 
+                device=hash_record.device,
                 rule=hash_record.rule
             )
-            self.assertFalse(compliance_record.compliance, 
+            self.assertFalse(compliance_record.compliance,
                            f"Hash record for {hash_record.device}/{hash_record.rule} should only exist for non-compliant configs")
-        
+
         # Verify our test data is included - check that device1 with feature1 appears in the queryset
         device1_hashes = queryset.filter(device=self.device1, rule=self.feature1)
         self.assertEqual(device1_hashes.count(), 1, "Device1 with feature1 should appear exactly once in the queryset")
-        
+
         # Verify the queryset excludes "intended" config types - check that no intended records appear
         all_hash_records = models.ConfigComplianceHash.objects.filter(
             device=self.device1, rule=self.feature1
