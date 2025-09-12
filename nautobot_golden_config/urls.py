@@ -20,7 +20,7 @@ router.register("config-plan", views.ConfigPlanUIViewSet)
 router.register("config-compliance", views.ConfigComplianceUIViewSet)
 router.register("golden-config", views.GoldenConfigUIViewSet)
 router.register("config-hash", views.ConfigComplianceHashUIViewSet)
-router.register("hash-grouping", views.ConfigHashGroupingViewSet)
+router.register("hash-grouping", views.ConfigHashGroupingUIViewSet)
 
 urlpatterns = [
     path("config-compliance/overview/", views.ConfigComplianceOverview.as_view(), name="configcompliance_overview"),

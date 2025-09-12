@@ -685,77 +685,91 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
 
     def perform_bulk_destroy(self, request, **kwargs):
         """Override bulk destroy to delete both actual and intended hashes for the same device/rule combinations."""
-        model = self.queryset.model
-
-        # Handle the primary key collection like the existing ConfigCompliance bulk delete
-        if request.POST.get("_all"):
-            filter_params = self.get_filter_params(request)
-            if not filter_params:
-                hash_objects = model.objects.only("pk").all().values_list("pk", flat=True)
-            elif self.filterset_class is None:
-                raise NotImplementedError("filterset_class must be defined to use _all")
-            else:
-                hash_objects = self.filterset_class(filter_params, model.objects.only("pk")).qs
-            self.pk_list = list(hash_objects.values_list("pk", flat=True))
-        elif "_confirm" not in request.POST:
-            # Initial selection - get the pk list from the form
-            self.pk_list = request.POST.getlist("pk")
-        else:
-            # Get the pk list from the form
-            self.pk_list = request.POST.getlist("pk")
-
-        form_class = self.get_form_class(**kwargs)
-        data = {}
+        self._collect_pk_list(request)
 
         if "_confirm" in request.POST:
-            form = form_class(request.POST)
-            if form.is_valid():
-                # Perform the actual deletion
-                if not self.pk_list:
-                    messages.error(request, "No items selected for deletion.")
-                    return redirect(self.get_return_url(request))
+            return self._perform_confirmed_deletion(request, **kwargs)
 
-                # Get the selected ConfigComplianceHash records
-                selected_hashes = models.ConfigComplianceHash.objects.filter(pk__in=self.pk_list)
+        return self._show_confirmation_page(request)
 
-                if not selected_hashes.exists():
-                    messages.error(request, "Selected items not found.")
-                    return redirect(self.get_return_url(request))
+    def _collect_pk_list(self, request):
+        """Collect primary keys for bulk operations."""
+        if request.POST.get("_all"):
+            self._collect_all_pks(request)
+        else:
+            self.pk_list = request.POST.getlist("pk")
 
-                # Extract device/rule combinations from selected hashes
-                device_rule_combinations = set()
-                for hash_record in selected_hashes:
-                    device_rule_combinations.add((hash_record.device_id, hash_record.rule_id))
+    def _collect_all_pks(self, request):
+        """Collect all primary keys based on filters."""
+        model = self.queryset.model
+        filter_params = self.get_filter_params(request)
 
-                # Delete both actual and intended hashes for the same device/rule combinations using bulk delete
-                # Use Django's tuple matching to filter by (device_id, rule_id) pairs in a single query
-                # Create a list of concatenated device_rule identifiers for matching
-                device_rule_identifiers = [f"{device_id}-{rule_id}" for device_id, rule_id in device_rule_combinations]
+        if not filter_params:
+            hash_objects = model.objects.only("pk").all().values_list("pk", flat=True)
+        elif self.filterset_class is None:
+            raise NotImplementedError("filterset_class must be defined to use _all")
+        else:
+            hash_objects = self.filterset_class(filter_params, model.objects.only("pk")).qs
 
-                # Perform single bulk delete operation using concatenated field matching
-                # Cast both fields to CharField to avoid mixed type errors
-                deleted_count, _ = (
-                    models.ConfigComplianceHash.objects.annotate(
-                        device_rule_key=Concat(
-                            Cast("device_id", output_field=CharField()),
-                            Value("-"),
-                            Cast("rule_id", output_field=CharField()),
-                        )
-                    )
-                    .filter(device_rule_key__in=device_rule_identifiers)
-                    .delete()
-                )
+        self.pk_list = list(hash_objects.values_list("pk", flat=True))
 
-                messages.success(
-                    request,
-                    f"Successfully deleted {deleted_count} configuration hash records "
-                    f"(both actual and intended) for {len(device_rule_combinations)} device/rule combinations.",
-                )
+    def _perform_confirmed_deletion(self, request, **kwargs):
+        """Execute the confirmed bulk deletion."""
+        form_class = self.get_form_class(**kwargs)
+        form = form_class(request.POST)
 
-                return redirect(self.get_return_url(request))
+        if not form.is_valid():
             return self.form_invalid(form)
 
-        # Show confirmation page
+        if not self.pk_list:
+            messages.error(request, "No items selected for deletion.")
+            return redirect(self.get_return_url(request))
+
+        return self._execute_hash_deletion(request)
+
+    def _execute_hash_deletion(self, request):
+        """Execute the actual hash record deletion."""
+        selected_hashes = models.ConfigComplianceHash.objects.filter(pk__in=self.pk_list)
+
+        if not selected_hashes.exists():
+            messages.error(request, "Selected items not found.")
+            return redirect(self.get_return_url(request))
+
+        device_rule_combinations = self._extract_device_rule_combinations(selected_hashes)
+        deleted_count = self._delete_hash_records(device_rule_combinations)
+
+        messages.success(
+            request,
+            f"Successfully deleted {deleted_count} configuration hash records "
+            f"(both actual and intended) for {len(device_rule_combinations)} device/rule combinations.",
+        )
+
+        return redirect(self.get_return_url(request))
+
+    def _extract_device_rule_combinations(self, selected_hashes):
+        """Extract unique device/rule combinations from selected hashes."""
+        return set((hash_record.device_id, hash_record.rule_id) for hash_record in selected_hashes)
+
+    def _delete_hash_records(self, device_rule_combinations):
+        """Delete hash records for given device/rule combinations."""
+        device_rule_identifiers = [f"{device_id}-{rule_id}" for device_id, rule_id in device_rule_combinations]
+
+        deleted_count, _ = (
+            models.ConfigComplianceHash.objects.annotate(
+                device_rule_key=Concat(
+                    Cast("device_id", output_field=CharField()),
+                    Value("-"),
+                    Cast("rule_id", output_field=CharField()),
+                )
+            )
+            .filter(device_rule_key__in=device_rule_identifiers)
+            .delete()
+        )
+
+        return deleted_count
+
+    def _show_confirmation_page(self, request):
+        """Show the confirmation page for bulk deletion."""
         table = self.table_class(self.queryset.filter(pk__in=self.pk_list), orderable=False)
 
         if not table.rows:
@@ -765,12 +779,15 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
             )
             return redirect(self.get_return_url(request))
 
-        if not request.POST.get("_all"):
-            data.update({"table": table, "total_objs_to_delete": len(table.rows)})
-        else:
-            data.update({"table": None, "delete_all": True, "total_objs_to_delete": len(table.rows)})
-
+        data = self._build_confirmation_data(request, table)
         return Response(data)
+
+    def _build_confirmation_data(self, request, table):
+        """Build data for confirmation page response."""
+        if request.POST.get("_all"):
+            return {"table": None, "delete_all": True, "total_objs_to_delete": len(table.rows)}
+
+        return {"table": table, "total_objs_to_delete": len(table.rows)}
 
 
 class ConfigHashGroupingUIViewSet(views.NautobotUIViewSet):

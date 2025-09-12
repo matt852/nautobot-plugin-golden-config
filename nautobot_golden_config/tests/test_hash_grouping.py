@@ -10,7 +10,7 @@ from nautobot_golden_config import models
 from nautobot_golden_config.filters import ConfigHashGroupingFilterSet
 from nautobot_golden_config.forms import ConfigHashGroupingFilterForm
 from nautobot_golden_config.tables import ConfigHashGroupingTable
-from nautobot_golden_config.views import ConfigHashGroupingViewSet
+from nautobot_golden_config.views import ConfigHashGroupingUIViewSet
 
 from .conftest import create_device_data, create_feature_rule_json
 
@@ -209,7 +209,7 @@ class ConfigHashGroupingViewTestCase(TestCase):
 
     def test_viewset_queryset_filters_groups_with_multiple_devices(self):
         """Test that viewset only shows groups with more than one device."""
-        viewset = ConfigHashGroupingViewSet()
+        viewset = ConfigHashGroupingUIViewSet()
         queryset = viewset.queryset
 
         # Should only include groups with device_count > 1
@@ -218,7 +218,7 @@ class ConfigHashGroupingViewTestCase(TestCase):
 
     def test_viewset_queryset_annotations(self):
         """Test that viewset queryset includes required annotations."""
-        viewset = ConfigHashGroupingViewSet()
+        viewset = ConfigHashGroupingUIViewSet()
         queryset = viewset.queryset
 
         if queryset.exists():
@@ -231,18 +231,18 @@ class ConfigHashGroupingViewTestCase(TestCase):
 
     def test_viewset_table_class(self):
         """Test that viewset uses correct table class."""
-        viewset = ConfigHashGroupingViewSet()
+        viewset = ConfigHashGroupingUIViewSet()
         self.assertEqual(viewset.table_class, ConfigHashGroupingTable)
 
     def test_viewset_filterset_classes(self):
         """Test that viewset uses correct filterset classes."""
-        viewset = ConfigHashGroupingViewSet()
+        viewset = ConfigHashGroupingUIViewSet()
         self.assertEqual(viewset.filterset_class, ConfigHashGroupingFilterSet)
         self.assertEqual(viewset.filterset_form_class, ConfigHashGroupingFilterForm)
 
     def test_viewset_no_action_buttons(self):
         """Test that viewset has disabled add/import action buttons."""
-        viewset = ConfigHashGroupingViewSet()
+        viewset = ConfigHashGroupingUIViewSet()
         self.assertEqual(viewset.action_buttons, [])
 
 
@@ -310,7 +310,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
 
     def test_table_initialization(self):
         """Test that ConfigHashGroupingTable can be initialized properly."""
-        queryset = ConfigHashGroupingViewSet().queryset
+        queryset = ConfigHashGroupingUIViewSet().queryset
         table = ConfigHashGroupingTable(data=queryset)
 
         # Table should initialize without errors
@@ -318,7 +318,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
 
     def test_table_columns_present(self):
         """Test that all expected columns are present in the table."""
-        queryset = ConfigHashGroupingViewSet().queryset
+        queryset = ConfigHashGroupingUIViewSet().queryset
         table = ConfigHashGroupingTable(data=queryset)
 
         # Check that expected columns exist
@@ -487,7 +487,7 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
         self.assertEqual(hash_groups.count(), 2)
 
         # But viewset should show neither (both have device_count = 1)
-        viewset = ConfigHashGroupingViewSet()
+        viewset = ConfigHashGroupingUIViewSet()
         queryset = viewset.queryset
         self.assertEqual(queryset.count(), 0)
 
