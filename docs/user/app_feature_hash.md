@@ -1,10 +1,10 @@
-# Configuration Mismatch Grouping
+# Configuration Hash Grouping
 
-The **Configuration Mismatch Grouping** feature enables administrators to identify devices that have identical non-compliant configurations, making it easier to troubleshoot and fix configuration issues that affect multiple devices simultaneously. This feature groups devices by their configuration hash values, allowing you to see patterns in configuration drift and apply fixes to entire groups at once.
+The **Configuration Hash Grouping** feature enables administrators to identify devices that have identical non-compliant configurations, making it easier to troubleshoot and fix configuration issues that affect multiple devices simultaneously. This feature groups devices by their configuration hash values, allowing you to see patterns in configuration drift and apply fixes to entire groups at once.
 
 ## Overview
 
-When configuration compliance issues affect multiple devices with identical misconfigurations, the traditional approach of reviewing each device individually can be time-consuming and inefficient. The Configuration Mismatch Grouping feature solves this by:
+When configuration compliance issues affect multiple devices with identical misconfigurations, the traditional approach of reviewing each device individually can be time-consuming and inefficient. The Configuration Hash Grouping feature solves this by:
 
 - Automatically grouping devices with identical configuration hashes
 - Providing a unified view of devices sharing the same configuration issues
@@ -13,7 +13,7 @@ When configuration compliance issues affect multiple devices with identical misc
 
 ## How It Works
 
-The Configuration Mismatch Grouping feature uses a three-model architecture to efficiently organize and display configuration data:
+The Configuration Hash Grouping feature uses a three-model architecture to efficiently organize and display configuration data:
 
 ### Architecture Components
 
@@ -32,22 +32,22 @@ When configuration compliance jobs run, the system:
 
 This approach eliminates duplicate storage while maintaining fast access to configuration data for analysis.
 
-## Accessing Configuration Mismatch Grouping
+## Accessing Configuration Hash Grouping
 
-To access the Configuration Mismatch Grouping feature:
+To access the Configuration Hash Grouping feature:
 
 1. Navigate to **Golden Config** in the main navigation menu
-2. Under the **Manage** section, select **Mismatch Grouping Report**
+2. Under the **Manage** section, select **Hash Grouping Report**
 3. The main view displays groups of devices with identical configuration hashes
 
 !!! note
     You must have the `view_configcompliance` permission to access this feature.
 
-## Configuration Mismatch Grouping Views
+## Configuration Hash Grouping Views
 
 ### Main Grouping View
 
-The main Configuration Mismatch Grouping view (`/config-compliance/hash-grouping/`) displays:
+The main Configuration Hash Grouping view (`/config-compliance/hash-grouping/`) displays:
 
 - **Feature Name**: The compliance rule feature being evaluated
 - **Device Count**: Number of devices sharing the same configuration hash (clickable to view devices)
@@ -56,7 +56,7 @@ The main Configuration Mismatch Grouping view (`/config-compliance/hash-grouping
 
 ### Device-Level Hash View
 
-The device-level view (`/config-compliance/mismatch-hash/`) provides:
+The device-level view (`/config-compliance/config-hash/`) provides:
 
 - Individual device details linked to their hash groups
 - Device-specific configuration information
@@ -73,7 +73,7 @@ The user interface includes several interactive elements:
 
 ## API Access
 
-The Configuration Mismatch Grouping feature provides REST API access for programmatic integration:
+The Configuration Hash Grouping feature provides REST API access for programmatic integration:
 
 ### Endpoints
 
@@ -89,25 +89,9 @@ curl -H "Authorization: Token YOUR_TOKEN" \
 
 # Get devices in a specific hash group
 curl -H "Authorization: Token YOUR_TOKEN" \
-  http://nautobot/api/plugins/golden-config/config-compliance-hash/?config_group=GROUP_ID
+  http://nautobot/api/plugins/golden-config/config-compliance-hash/
 ```
-
-## Future Enhancements
-
-### Planned Features
-
-- **Advanced Analytics**: Historical tracking of configuration patterns and trends
-- **Enhanced Batch Operations**: Bulk remediation jobs that operate on entire hash groups
-- **Export Capabilities**: CSV and JSON export options for compliance reporting
-- **Configuration Diff Views**: Side-by-side comparisons between different hash groups
-
-### Integration Opportunities
-
-- **Git Integration**: Link configuration changes to Git commits and pull requests
-- **CI/CD Support**: Automated validation of configuration changes in development pipelines
-- **Monitoring Integration**: Alerts when new configuration drift patterns emerge
-- **Machine Learning**: Predictive analytics for configuration compliance trends
 
 ## Summary
 
-The Configuration Mismatch Grouping feature represents a significant enhancement to Nautobot Golden Config's compliance capabilities. By grouping devices with identical configuration hashes, it provides network administrators with powerful tools for identifying, analyzing, and resolving configuration issues at scale. The feature's three-model architecture ensures excellent performance while maintaining data integrity, and its seamless integration with existing Golden Config functionality makes it immediately useful in any network automation workflow.
+The Configuration Hash Grouping feature represents a significant enhancement to Nautobot Golden Config's compliance capabilities. By grouping devices with identical configuration hashes, it provides network administrators with powerful tools for identifying, analyzing, and resolving configuration issues at scale. The feature's three-model architecture ensures excellent performance while maintaining data integrity, and its seamless integration with existing Golden Config functionality makes it immediately useful in any network automation workflow.

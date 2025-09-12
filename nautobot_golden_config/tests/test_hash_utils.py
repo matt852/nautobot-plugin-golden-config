@@ -115,13 +115,13 @@ class ConfigMismatchHashViewSetTestCase(TestCase):
             compliance_records = models.ConfigCompliance.objects.filter(
                 device=hash_record.device, rule=hash_record.rule
             )
-            
+
             if not compliance_records.exists():
                 # This indicates a data consistency issue - hash record exists without compliance record
                 # Clean up the orphaned hash record and continue the test
                 hash_record.delete()
                 continue
-                
+
             compliance_record = compliance_records.first()
             self.assertFalse(
                 compliance_record.compliance,
