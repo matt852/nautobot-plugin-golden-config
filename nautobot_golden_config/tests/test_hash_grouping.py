@@ -601,7 +601,7 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
         print(f"Intended records with config_group: {intended_with_group}")
 
         # Get the hash group IDs to delete
-        group_pks = list(hash_groups.values_list('pk', flat=True))
+        group_pks = list(hash_groups.values_list("pk", flat=True))
 
         # Debug: Check ConfigCompliance records before deletion
         compliance_before = models.ConfigCompliance.objects.filter(rule=self.feature1).count()
@@ -622,10 +622,10 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
         viewset = ConfigHashGroupingUIViewSet()
         viewset.request = request
 
-        with patch.object(viewset, 'get_form_class') as mock_get_form_class:
+        with patch.object(viewset, "get_form_class") as mock_get_form_class:
             mock_get_form_class.return_value = MagicMock(return_value=mock_form)
 
-            with patch.object(viewset, 'get_return_url') as mock_get_return_url:
+            with patch.object(viewset, "get_return_url") as mock_get_return_url:
                 mock_get_return_url.return_value = "/test-return/"
 
                 # Call perform_bulk_destroy
@@ -640,9 +640,7 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
         print(f"Remaining hash records after deletion: {remaining_hash_records.count()}")
 
         # Debug: Check what type of records remain
-        remaining_actual = models.ConfigComplianceHash.objects.filter(
-            rule=self.feature1, config_type="actual"
-        ).count()
+        remaining_actual = models.ConfigComplianceHash.objects.filter(rule=self.feature1, config_type="actual").count()
         remaining_intended = models.ConfigComplianceHash.objects.filter(
             rule=self.feature1, config_type="intended"
         ).count()

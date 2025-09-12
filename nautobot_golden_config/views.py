@@ -644,7 +644,6 @@ class GenerateIntendedConfigView(PermissionRequiredMixin, TemplateView):
         return context
 
 
-
 class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     """View for configuration hashes with bulk operations."""
 
@@ -663,9 +662,7 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
         .filter(
             Exists(
                 models.ConfigCompliance.objects.filter(
-                    device=OuterRef('device'),
-                    rule=OuterRef('rule'),
-                    compliance=False
+                    device=OuterRef("device"), rule=OuterRef("rule"), compliance=False
                 )
             )
         )
@@ -864,9 +861,7 @@ class ConfigHashGroupingUIViewSet(views.NautobotUIViewSet):
 
                     # Collect device/rule combinations for the success message
                     # Use values() to get distinct combinations efficiently
-                    device_rule_combinations = set(
-                        related_hash_records.values_list("device_id", "rule_id")
-                    )
+                    device_rule_combinations = set(related_hash_records.values_list("device_id", "rule_id"))
 
                     # Count hash records that will be deleted before deletion
                     hash_records_count = related_hash_records.count()
