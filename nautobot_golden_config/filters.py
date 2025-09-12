@@ -184,7 +184,33 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         fields = "__all__"
 
 
-class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
+class HashGroupingFilterMixin:
+    """Mixin providing common hash grouping filter functionality."""
+
+    def filter_by_device(self, queryset, _name, value):
+        """Filter ConfigHashGrouping records by devices that are members of the groups."""
+        if not value:
+            return queryset
+
+        # Get device IDs from the filter value
+        device_ids = []
+        for device in value:
+            if hasattr(device, "id"):
+                device_ids.append(device.id)
+            else:
+                device_ids.append(device)
+
+        # Find all ConfigHashGrouping IDs where these devices have corresponding ConfigComplianceHash records
+        hash_group_ids = (
+            models.ConfigComplianceHash.objects.filter(device_id__in=device_ids, config_group__isnull=False)
+            .values_list("config_group_id", flat=True)
+            .distinct()
+        )
+
+        return queryset.filter(id__in=hash_group_ids)
+
+
+class ConfigHashGroupingFilterSet(HashGroupingFilterMixin, NautobotFilterSet):
     """Custom filter for configuration hash grouping that handles device filtering properly."""
 
     feature = django_filters.ModelMultipleChoiceFilter(
@@ -201,32 +227,12 @@ class ConfigHashGroupingFilterSet(GoldenConfigFilterSet):
         method="filter_by_device",
     )
 
-    def filter_by_device(self, queryset, name, value):  # pylint: disable=unused-argument
-        """Filter ConfigHashGrouping records by devices that are members of the groups."""
-        if not value:
-            return queryset
-
-        # Get device IDs from the filter value
-        device_ids = []
-        for device in value:
-            if hasattr(device, 'id'):
-                device_ids.append(device.id)
-            else:
-                device_ids.append(device)
-
-        # Find all ConfigHashGrouping IDs where these devices have corresponding ConfigComplianceHash records
-        hash_group_ids = models.ConfigComplianceHash.objects.filter(
-            device_id__in=device_ids,
-            config_group__isnull=False
-        ).values_list('config_group_id', flat=True).distinct()
-
-        return queryset.filter(id__in=hash_group_ids)
-
     class Meta:
         """Meta class attributes for ConfigHashGroupingFilterSet."""
 
         model = models.ConfigHashGrouping
         fields = "__all__"
+
 
 
 class ConfigComplianceHashFilterSet(GoldenConfigFilterSet):
