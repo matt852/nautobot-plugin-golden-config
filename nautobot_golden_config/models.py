@@ -1,6 +1,5 @@
 """Django Models for tracking the configuration compliance per feature and device."""
 
-import hashlib
 import json
 import logging
 import os
@@ -25,6 +24,7 @@ from xmldiff import actions, main
 
 from nautobot_golden_config.choices import ComplianceRuleConfigTypeChoice, ConfigPlanTypeChoice, RemediationTypeChoice
 from nautobot_golden_config.utilities.constant import ENABLE_SOTAGG, PLUGIN_CFG
+from nautobot_golden_config.utilities.hash_utils import cleanup_orphaned_hash_groups_for_rule, compute_config_hash
 
 LOGGER = logging.getLogger(__name__)
 GRAPHQL_STR_START = "query ($device_id: ID!)"
@@ -61,29 +61,6 @@ def _null_to_empty(val):
     if not val:
         return ""
     return val
-
-
-def _normalize_config_content(content):
-    """Normalize configuration content for consistent hashing."""
-    if not content:
-        return ""
-
-    if isinstance(content, dict):
-        return json.dumps(content, sort_keys=True)
-
-    if isinstance(content, list):
-        return json.dumps(content, sort_keys=True)
-
-    if isinstance(content, str):
-        return content.strip()
-
-    return str(content).strip()
-
-
-def _compute_config_hash(content):
-    """Compute SHA-256 hash of configuration content."""
-    normalized_content = _normalize_config_content(content)
-    return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
 
 
 def _get_cli_compliance(obj):
@@ -458,8 +435,8 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
     def _update_config_hashes(self):
         """Update or create ConfigComplianceHash records and ConfigHashGrouping for actual and intended configs."""
         # Compute configuration hashes
-        actual_hash = _compute_config_hash(self.actual)
-        intended_hash = _compute_config_hash(self.intended)
+        actual_hash = compute_config_hash(self.actual)
+        intended_hash = compute_config_hash(self.intended)
 
         # Handle actual config grouping
         if actual_hash and not self.compliance:  # Only group non-compliant configs
@@ -484,7 +461,7 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
             )
         else:
             # Create/update hash record for actual config without group (compliant or empty)
-            ConfigComplianceHash.objects.update_or_create(
+            hash_record, created = ConfigComplianceHash.objects.update_or_create(
                 device=self.device,
                 rule=self.rule,
                 config_type="actual",
@@ -493,6 +470,10 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
                     "config_group": None,
                 },
             )
+            # Explicitly ensure config_group is None for existing records
+            if not created and hash_record.config_group is not None:
+                hash_record.config_group = None
+                hash_record.save()
 
         # Create/update hash record for intended config (no grouping needed for intended)
         ConfigComplianceHash.objects.update_or_create(
@@ -504,6 +485,13 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
                 "config_group": None,  # Intended configs don't get grouped
             },
         )
+
+        # Clean up orphaned ConfigHashGrouping records that no longer have any linked devices
+        self._cleanup_orphaned_hash_groups()
+
+    def _cleanup_orphaned_hash_groups(self):
+        """Remove ConfigHashGrouping records that no longer have any linked devices."""
+        cleanup_orphaned_hash_groups_for_rule(self.rule)
 
     def remediation_on_save(self):
         """The actual remediation happens here, before saving the object."""
@@ -1012,6 +1000,15 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
     def __str__(self):
         """String representation of the hash record."""
         return f"{self.device} -> {self.rule} -> {self.config_type} -> {self.config_hash}"
+
+    def delete(self, *args, **kwargs):
+        """Override delete to clean up orphaned ConfigHashGrouping records."""
+        rule = self.rule
+        result = super().delete(*args, **kwargs)
+
+        # Clean up orphaned groups for this rule after deletion
+        cleanup_orphaned_hash_groups_for_rule(rule)
+        return result
 
 
 @extras_features(
