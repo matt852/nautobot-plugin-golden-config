@@ -652,6 +652,9 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
     table_class = tables.ConfigComplianceHashTable
     serializer_class = serializers.ConfigComplianceHashSerializer
 
+    # Disable add and import actions since hashes are generated automatically
+    action_buttons = []
+
     # Base queryset of individual ConfigComplianceHash objects
     # Show actual config hashes where there's a corresponding non-compliant ConfigCompliance record
     queryset = (
@@ -838,96 +841,65 @@ class ConfigHashGroupingUIViewSet(views.NautobotUIViewSet):
 
     def perform_bulk_destroy(self, request, **kwargs):
         """Override bulk destroy to cascade delete related ConfigComplianceHash records for each group's rule."""
-        self._collect_pk_list(request)
-
-        if "_confirm" in request.POST:
-            return self._perform_confirmed_group_deletion(request, **kwargs)
-
-        return self._show_group_confirmation_page(request)
-
-    def _perform_confirmed_group_deletion(self, request, **kwargs):
-        """Execute the confirmed bulk deletion of hash groups."""
-        form_class = self.get_form_class(**kwargs)
-        form = form_class(request.POST)
-
-        if not form.is_valid():
-            return self.form_invalid(form)
-
-        if not self.pk_list:
-            messages.error(request, "No hash groups selected for deletion.")
+        model = self.queryset.model
+        
+        # Are we deleting *all* objects in the queryset or just a selected subset?
+        if request.POST.get("_all"):
+            filter_params = self.get_filter_params(request)
+            if not filter_params:
+                pk_list = list(model.objects.only("pk").all().values_list("pk", flat=True))
+            elif self.filterset_class is None:
+                raise NotImplementedError("filterset_class must be defined to use _all")
+            else:
+                pk_list = list(self.filterset_class(filter_params, model.objects.only("pk")).qs.values_list("pk", flat=True))
+        else:
+            pk_list = request.POST.getlist("pk")
+        
+        # Ensure pk_list is not empty
+        if not pk_list:
+            messages.warning(request, "No items selected for deletion.")
             return redirect(self.get_return_url(request))
 
-        try:
-            deletion_result = self._execute_group_deletion()
-            self._send_deletion_success_message(request, deletion_result)
-        except (models.ConfigHashGrouping.DoesNotExist, models.ConfigComplianceHash.DoesNotExist) as e:
-            messages.error(request, f"Selected items not found: {str(e)}")
-        except ValueError as e:
-            messages.error(request, f"Invalid data provided: {str(e)}")
+        form_class = self.get_form_class(**kwargs)
+        
+        if "_confirm" in request.POST:
+            form = form_class(request.POST)
+            if form.is_valid():
+                # Get the hash groups to be deleted
+                selected_groups = model.objects.filter(pk__in=pk_list)
+                
+                # Delete related ConfigComplianceHash records first
+                related_hash_records = models.ConfigComplianceHash.objects.filter(
+                    config_group__in=selected_groups
+                )
+                hash_count = related_hash_records.count()
+                related_hash_records.delete()
+                
+                # Delete the hash groups themselves
+                group_count = selected_groups.count()
+                selected_groups.delete()
+                
+                messages.success(
+                    request,
+                    f"Successfully deleted {group_count} hash group(s) and {hash_count} related hash records."
+                )
+                return redirect(self.get_return_url(request))
+            return self.form_invalid(form)
 
-        return redirect(self.get_return_url(request))
+        # Show confirmation page
+        table = self.table_class(self.queryset.filter(pk__in=pk_list), orderable=False)
 
-    def _execute_group_deletion(self):
-        """Execute the actual deletion of hash groups and related records."""
-        model = self.queryset.model
-
-        # Get selected groups and related data
-        selected_groups = model.objects.filter(pk__in=self.pk_list)
-        group_count = selected_groups.count()
-
-        if group_count == 0:
-            raise model.DoesNotExist("No hash groups found for the provided IDs")
-
-        # Get related hash records
-        related_hash_records = models.ConfigComplianceHash.objects.filter(
-            config_group__in=selected_groups
-        ).select_related("device", "rule")
-
-        device_rule_combinations = set(related_hash_records.values_list("device_id", "rule_id"))
-        hash_records_count = related_hash_records.count()
-
-        # Perform deletions
-        related_hash_records.delete()
-        selected_groups.delete()
-
-        return {
-            "group_count": group_count,
-            "hash_records_count": hash_records_count,
-            "device_rule_count": len(device_rule_combinations),
-        }
-
-    def _send_deletion_success_message(self, request, deletion_result):
-        """Send success message for deletion operation."""
-        group_count = deletion_result["group_count"]
-        hash_records_count = deletion_result["hash_records_count"]
-        device_rule_count = deletion_result["device_rule_count"]
-
-        group_suffix = "" if group_count == 1 else "s"
-        record_suffix = "" if hash_records_count == 1 else "s"
-        combination_suffix = "" if device_rule_count == 1 else "s"
-
-        messages.success(
-            request,
-            f"Successfully deleted {group_count} configuration hash group{group_suffix} "
-            f"and {hash_records_count} related hash record{record_suffix} "
-            f"for {device_rule_count} device/rule combination{combination_suffix}.",
-        )
-
-    def _show_group_confirmation_page(self, request):
-        """Show the confirmation page for hash group bulk deletion."""
-        model = self.queryset.model
-
-        selected_hash_groups = (
-            model.objects.filter(pk__in=self.pk_list)
-            .select_related("rule__feature")
-            .annotate(
-                feature_name=F("rule__feature__name"),
-                feature_id=F("rule__feature__id"),
+        if not table.rows:
+            messages.warning(
+                request,
+                f"No {self.queryset.model._meta.verbose_name_plural} were selected for deletion.",
             )
-        )
-        table = tables.ConfigHashGroupingTable(selected_hash_groups)
+            return redirect(self.get_return_url(request))
 
-        data = self._build_confirmation_data(request, table)
+        data = {"table": table, "total_objs_to_delete": len(table.rows)}
+        if request.POST.get("_all"):
+            data.update({"delete_all": True})
+        
         return Response(data)
 
 
