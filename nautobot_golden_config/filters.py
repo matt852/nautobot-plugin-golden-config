@@ -156,7 +156,7 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         label="Config Hash Group",
     )
 
-    def filter_by_hash_group(self, queryset, name, value):
+    def filter_by_hash_group(self, queryset, _name, value):
         """Filter ConfigCompliance records by config hash group ID."""
         if not value:
             return queryset
@@ -184,8 +184,28 @@ class ConfigComplianceFilterSet(GoldenConfigFilterSet):  # pylint: disable=too-m
         fields = "__all__"
 
 
-class HashGroupingFilterMixin:
-    """Mixin providing common hash grouping filter functionality."""
+class ConfigHashGroupingFilterSet(NautobotFilterSet):
+    """Custom filter for configuration hash grouping that handles device filtering properly."""
+
+    feature = django_filters.ModelMultipleChoiceFilter(
+        field_name="rule__feature__name",
+        queryset=models.ComplianceFeature.objects.all(),
+        to_field_name="name",
+        label="Feature",
+    )
+
+    device = NaturalKeyOrPKMultipleChoiceFilter(
+        queryset=Device.objects.all(),
+        to_field_name="name",
+        label="Device (name or ID)",
+        method="filter_by_device",
+    )
+
+    class Meta:
+        """Meta class attributes for ConfigHashGroupingFilterSet."""
+
+        model = models.ConfigHashGrouping
+        fields = "__all__"
 
     def filter_by_device(self, queryset, _name, value):
         """Filter ConfigHashGrouping records by devices that are members of the groups."""
@@ -208,30 +228,6 @@ class HashGroupingFilterMixin:
         )
 
         return queryset.filter(id__in=hash_group_ids)
-
-
-class ConfigHashGroupingFilterSet(HashGroupingFilterMixin, NautobotFilterSet):
-    """Custom filter for configuration hash grouping that handles device filtering properly."""
-
-    feature = django_filters.ModelMultipleChoiceFilter(
-        field_name="rule__feature__name",
-        queryset=models.ComplianceFeature.objects.all(),
-        to_field_name="name",
-        label="Feature",
-    )
-
-    device = NaturalKeyOrPKMultipleChoiceFilter(
-        queryset=Device.objects.all(),
-        to_field_name="name",
-        label="Device (name or ID)",
-        method="filter_by_device",
-    )
-
-    class Meta:
-        """Meta class attributes for ConfigHashGroupingFilterSet."""
-
-        model = models.ConfigHashGrouping
-        fields = "__all__"
 
 
 
@@ -258,7 +254,7 @@ class ConfigComplianceHashFilterSet(GoldenConfigFilterSet):
         label="Device (name or ID)",
     )
 
-    def filter_device(self, queryset, _, value):
+    def filter_device(self, queryset, _name, value):
         """Custom device filtering for grouped mismatch data."""
         # Get the devices to filter by
         device_ids = [device.id if hasattr(device, "id") else device for device in value]
@@ -420,7 +416,7 @@ class GoldenConfigSettingFilterSet(NautobotFilterSet):
         method="filter_device_id",
     )
 
-    def filter_device_id(self, queryset, name, value):  # pylint: disable=unused-argument
+    def filter_device_id(self, queryset, _name, value):
         """Filter by Device ID."""
         if not value:
             return queryset
