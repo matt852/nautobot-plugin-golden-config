@@ -487,10 +487,6 @@ class ConfigCompliance(PrimaryModel):  # pylint: disable=too-many-ancestors, too
         )
 
         # Clean up orphaned ConfigHashGrouping records that no longer have any linked devices
-        self._cleanup_orphaned_hash_groups()
-
-    def _cleanup_orphaned_hash_groups(self):
-        """Remove ConfigHashGrouping records that no longer have any linked devices."""
         cleanup_orphaned_hash_groups_for_rule(self.rule)
 
     def remediation_on_save(self):
