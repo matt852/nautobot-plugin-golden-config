@@ -1,5 +1,6 @@
 """Unit tests for nautobot_golden_config hash grouping feature."""
 
+import hashlib
 import json
 from unittest.mock import MagicMock, patch
 
@@ -347,8 +348,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
     def test_table_actions_column_template(self):
         """Test that actions column contains expected remediation button with data attributes."""
         # Get the actions column template from the table class definition
-        table_class = ConfigHashGroupingTable
-        actions_column = table_class.base_columns["actions"]
+        actions_column = ConfigHashGroupingTable.base_columns["actions"]
         template_code = actions_column.template_code
 
         # Check for button instead of link
@@ -366,8 +366,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
     def test_table_device_count_column_template(self):
         """Test device count column template for filtering links."""
         # Get the device_count column template from the table class definition
-        table_class = ConfigHashGroupingTable
-        device_count_column = table_class.base_columns["device_count"]
+        device_count_column = ConfigHashGroupingTable.base_columns["device_count"]
         template_code = device_count_column.template_code
 
         # Check for filtering URL with parameters
@@ -378,8 +377,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
     def test_table_config_content_column_template(self):
         """Test config content column template structure."""
         # Get the config_content column template from the table class definition
-        table_class = ConfigHashGroupingTable
-        config_content_column = table_class.base_columns["config_content"]
+        config_content_column = ConfigHashGroupingTable.base_columns["config_content"]
         template_code = config_content_column.template_code
 
         # Check for clipboard functionality in the display template
@@ -974,10 +972,6 @@ class ConfigHashGroupingTemplateTestCase(TestCase):
             compliance=False,
             compliance_int=0,
         )
-
-        # Directly create ConfigHashGrouping to ensure it exists for template tests
-        import hashlib
-        import json
 
         config_hash = hashlib.md5(json.dumps(cls.config_content, sort_keys=True).encode()).hexdigest()
         cls.hash_group = models.ConfigHashGrouping.objects.create(
