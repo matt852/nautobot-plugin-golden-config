@@ -1031,12 +1031,7 @@ class RemediateHashGroupView(PermissionRequiredMixin, View):
                 device=device_ids,
             )
 
-            return JsonResponse({
-                "job_result": {
-                    "id": str(job_result.pk),
-                    "url": job_result.get_absolute_url()
-                }
-            })
+            return JsonResponse({"job_result": {"id": str(job_result.pk), "url": job_result.get_absolute_url()}})
 
         except (Job.DoesNotExist, ValueError, TypeError, RuntimeError) as e:
             return JsonResponse({"error": f"Error starting remediation job: {str(e)}"}, status=500)
