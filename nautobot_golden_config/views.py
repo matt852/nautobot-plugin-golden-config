@@ -785,6 +785,7 @@ class ConfigHashGroupingUIViewSet(views.NautobotUIViewSet):
 
     # Disable add and import actions since this is a read-only report
     action_buttons = []
+    template_name = "nautobot_golden_config/confighashgrouping_list.html"
 
     queryset = (
         models.ConfigHashGrouping.objects.annotate(
@@ -910,7 +911,7 @@ class RemediateHashGroupView(PermissionRequiredMixin, View):
     permission_required = ["extras.run_job"]
 
     def get(self, request):
-        """Handle GET request to run the remediation job."""
+        """Handle GET request to run the remediation job (legacy behavior for direct links)."""
         feature_id = request.GET.get("feature_id")
         config_hash = request.GET.get("config_hash")
 
@@ -970,3 +971,74 @@ class RemediateHashGroupView(PermissionRequiredMixin, View):
         except (Job.DoesNotExist, ValueError, TypeError, RuntimeError) as e:
             messages.error(request, f"Error starting remediation job: {str(e)}")
             return redirect("plugins:nautobot_golden_config:configcompliance_hash_grouping")
+
+    def post(self, request):
+        """Handle POST request for AJAX modal job execution."""
+        from django.http import JsonResponse
+        from nautobot.extras.models import Job, JobResult
+
+        feature_id = request.POST.get("feature_id")
+        config_hash = request.POST.get("config_hash")
+        get_devices_only = request.POST.get("get_devices_only")
+
+        if not feature_id or not config_hash:
+            return JsonResponse({"error": "Missing feature_id or config_hash parameters."}, status=400)
+
+        try:
+            feature = models.ComplianceFeature.objects.get(pk=feature_id)
+
+            # Get the config group for this feature and hash
+            try:
+                config_group = models.ConfigHashGrouping.objects.get(
+                    rule__feature_id=feature_id, config_hash=config_hash
+                )
+            except models.ConfigHashGrouping.DoesNotExist:
+                return JsonResponse({"error": "Configuration group not found for this feature and hash"}, status=404)
+
+            # Get all devices in this hash group
+            devices_in_group = (
+                models.ConfigComplianceHash.objects.filter(
+                    config_group=config_group,
+                    config_type="actual",
+                    device__configcompliance__rule__feature_id=feature_id,
+                    device__configcompliance__compliance=False,
+                )
+                .values_list("device_id", flat=True)
+                .distinct()
+            )
+
+            if not devices_in_group:
+                return JsonResponse({"error": "No devices found in hash group for this feature"}, status=404)
+
+            device_ids = list(devices_in_group)
+
+            if not device_ids:
+                return JsonResponse({"error": "No devices found for this hash group."}, status=404)
+
+            # If only requesting device IDs, return them without starting a job
+            if get_devices_only == "true":
+                return JsonResponse({"device_ids": device_ids})
+
+            # Get the GenerateConfigPlans job
+            job = Job.objects.get(name="Generate Config Plans")
+
+            # Enqueue the job
+            job_result = JobResult.enqueue_job(
+                job,
+                request.user,
+                plan_type="remediation",
+                feature=[feature.pk],
+                device=device_ids,
+            )
+
+            return JsonResponse({
+                "job_result": {
+                    "id": str(job_result.pk),
+                    "url": job_result.get_absolute_url()
+                }
+            })
+
+        except (Job.DoesNotExist, ValueError, TypeError, RuntimeError) as e:
+            return JsonResponse({"error": f"Error starting remediation job: {str(e)}"}, status=500)
+        except models.ComplianceFeature.DoesNotExist:
+            return JsonResponse({"error": f"Feature with ID {feature_id} not found"}, status=404)
