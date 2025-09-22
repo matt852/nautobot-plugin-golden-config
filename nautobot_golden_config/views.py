@@ -911,7 +911,7 @@ class RemediateHashGroupView(PermissionRequiredMixin, View):
     permission_required = ["extras.run_job"]
 
     def get(self, request):
-        """Handle GET request to run the remediation job (legacy behavior for direct links)."""
+        """Handle GET request to run the remediation job."""
         feature_id = request.GET.get("feature_id")
         config_hash = request.GET.get("config_hash")
 
