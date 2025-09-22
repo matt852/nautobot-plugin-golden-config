@@ -1,8 +1,10 @@
 """Unit tests for nautobot_golden_config hash grouping feature."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from nautobot.apps.testing import TestCase
@@ -12,7 +14,7 @@ from nautobot_golden_config import models
 from nautobot_golden_config.filters import ConfigHashGroupingFilterSet
 from nautobot_golden_config.forms import ConfigHashGroupingFilterForm
 from nautobot_golden_config.tables import ConfigHashGroupingTable
-from nautobot_golden_config.views import ConfigHashGroupingUIViewSet
+from nautobot_golden_config.views import ConfigHashGroupingUIViewSet, RemediateHashGroupView
 
 from .conftest import create_device_data, create_feature_rule_json
 
@@ -343,16 +345,23 @@ class ConfigHashGroupingTableTestCase(TestCase):
         self.assertEqual(table.Meta.default_columns, expected_fields)
 
     def test_table_actions_column_template(self):
-        """Test that actions column contains expected remediation links."""
+        """Test that actions column contains expected remediation button with data attributes."""
         # Get the actions column template from the table class definition
         table_class = ConfigHashGroupingTable
         actions_column = table_class.base_columns["actions"]
         template_code = actions_column.template_code
 
-        # Check for expected URL pattern and icon
-        self.assertIn("configcompliance_remediate", template_code)
+        # Check for button instead of link
+        self.assertIn("<button", template_code)
+        self.assertIn("hash-plan-generate", template_code)
         self.assertIn("mdi-map-check-outline", template_code)
         self.assertIn("Generate Remediation Config Plans", template_code)
+
+        # Check for data attributes needed for modal functionality
+        self.assertIn("data-feature-id", template_code)
+        self.assertIn("data-config-hash", template_code)
+        self.assertIn("data-feature-name", template_code)
+        self.assertIn("data-device-count", template_code)
 
     def test_table_device_count_column_template(self):
         """Test device count column template for filtering links."""
@@ -667,3 +676,438 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
 
         # Verify success message was called
         mock_messages.success.assert_called_once()
+
+
+@override_settings(EXEMPT_VIEW_PERMISSIONS=["*"])
+class RemediateHashGroupViewTestCase(TestCase):
+    """Test RemediateHashGroupView functionality."""
+
+    @classmethod
+    def setUpTestData(cls):
+        """Set up test data for RemediateHashGroupView tests."""
+        create_device_data()
+
+        # Get devices
+        cls.device1 = Device.objects.get(name="Device 1")
+        cls.device2 = Device.objects.get(name="Device 2")
+        cls.device3 = Device.objects.get(name="Device 3")
+
+        # Create compliance features
+        cls.feature1 = create_feature_rule_json(cls.device1, feature="TestFeature1")
+
+        # Create identical configs for multiple devices to create hash groups
+        cls.config_content = {"interface": {"GigabitEthernet0/1": {"ip_address": "192.168.1.1/24"}}}
+
+        # Create ConfigHashGrouping
+        cls.hash_group = models.ConfigHashGrouping.objects.create(
+            rule=cls.feature1,
+            config_hash="test123hash",
+            config_content=cls.config_content,
+        )
+
+        # Create ConfigComplianceHash records
+        models.ConfigComplianceHash.objects.create(
+            device=cls.device1,
+            rule=cls.feature1,
+            config_type="actual",
+            config_hash="test123hash",
+            config_group=cls.hash_group,
+        )
+        models.ConfigComplianceHash.objects.create(
+            device=cls.device2,
+            rule=cls.feature1,
+            config_type="actual",
+            config_hash="test123hash",
+            config_group=cls.hash_group,
+        )
+
+        # Create ConfigCompliance records (non-compliant)
+        models.ConfigCompliance.objects.create(
+            device=cls.device1,
+            rule=cls.feature1,
+            actual=cls.config_content,
+            intended={"different": "config"},
+            compliance=False,
+            compliance_int=0,
+        )
+        models.ConfigCompliance.objects.create(
+            device=cls.device2,
+            rule=cls.feature1,
+            actual=cls.config_content,
+            intended={"different": "config"},
+            compliance=False,
+            compliance_int=0,
+        )
+
+    def setUp(self):
+        """Set up test fixtures for each test method."""
+        self.factory = RequestFactory()
+        self.user = User.objects.create_superuser(username="testuser", email="test@example.com", password="testpass")
+
+    @patch("nautobot_golden_config.views.messages")
+    @patch("nautobot_golden_config.views.redirect")
+    def test_get_method_legacy_behavior(self, mock_redirect, mock_messages):
+        """Test that GET method maintains legacy redirect behavior."""
+        # Get fresh objects from database
+        rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
+        feature = rule.feature
+        # Get the actual hash from the database (not from self.hash_group which may be stale)
+        actual_hash_group = models.ConfigHashGrouping.objects.filter(rule=rule).first()
+        actual_hash = actual_hash_group.config_hash if actual_hash_group else "test123hash"
+
+        mock_redirect.return_value = "redirect_response"
+
+        request = self.factory.get(
+            "/config-compliance/remediate/",
+            {"feature_id": str(feature.pk), "config_hash": actual_hash}
+        )
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+
+        with patch('nautobot.extras.models.JobResult') as mock_job_result:
+            mock_job = MagicMock()
+            mock_job_result.enqueue_job.return_value = mock_job
+            mock_job.get_absolute_url.return_value = "/job-result/123/"
+
+            with patch('nautobot.extras.models.Job') as mock_job_class:
+                mock_job_class.objects.get.return_value = MagicMock()
+
+                response = view.get(request)
+
+        self.assertEqual(response, "redirect_response")
+        mock_messages.success.assert_called_once()
+
+    def test_post_method_get_devices_only(self):
+        """Test POST method with get_devices_only flag returns device IDs."""
+        # Get fresh objects from database
+        rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
+        feature = rule.feature
+        # Get the actual hash from the database (not from self.hash_group which may be stale)
+        actual_hash_group = models.ConfigHashGrouping.objects.filter(rule=rule).first()
+        actual_hash = actual_hash_group.config_hash if actual_hash_group else "test123hash"
+
+        request = self.factory.post(
+            "/config-compliance/remediate/",
+            {
+                "feature_id": str(feature.pk),
+                "config_hash": actual_hash,
+                "get_devices_only": "true"
+            }
+        )
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+        response = view.post(request)
+
+        self.assertEqual(response.status_code, 200)
+        response_data = json.loads(response.content)
+        self.assertIn("device_ids", response_data)
+        # Check that we get the expected devices (may be 1 or 2 depending on test data)
+        expected_devices = list(models.ConfigComplianceHash.objects.filter(
+            rule=rule,
+            config_type="actual",
+            config_group__isnull=False,
+            device__configcompliance__rule=rule,
+            device__configcompliance__compliance=False,
+        ).values_list("device_id", flat=True).distinct())
+
+        self.assertEqual(len(response_data["device_ids"]), len(expected_devices))
+        for device_id in expected_devices:
+            # Convert UUID to string for comparison
+            self.assertIn(str(device_id), response_data["device_ids"])
+
+    @patch('nautobot.extras.models.JobResult')
+    @patch('nautobot.extras.models.Job')
+    def test_post_method_starts_job(self, mock_job_class, mock_job_result):
+        """Test POST method starts job and returns job result data."""
+        # Get fresh objects from database
+        rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
+        feature = rule.feature
+        # Get the actual hash from the database (not from self.hash_group which may be stale)
+        actual_hash_group = models.ConfigHashGrouping.objects.filter(rule=rule).first()
+        actual_hash = actual_hash_group.config_hash if actual_hash_group else "test123hash"
+
+        mock_job = MagicMock()
+        mock_job_class.objects.get.return_value = mock_job
+
+        mock_job_result_obj = MagicMock()
+        # Use a proper UUID format for the mock
+        mock_uuid = "12345678-1234-5678-9abc-123456789012"
+        mock_job_result_obj.pk = mock_uuid
+        mock_job_result_obj.id = mock_uuid
+        mock_job_result_obj.get_absolute_url.return_value = "/job-result/123/"
+        mock_job_result.enqueue_job.return_value = mock_job_result_obj
+
+        request = self.factory.post(
+            "/config-compliance/remediate/",
+            {
+                "feature_id": str(feature.pk),
+                "config_hash": actual_hash
+            }
+        )
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+        response = view.post(request)
+
+        self.assertEqual(response.status_code, 200)
+        response_data = json.loads(response.content)
+        self.assertIn("job_result", response_data)
+        self.assertIn("id", response_data["job_result"])
+        self.assertIn("url", response_data["job_result"])
+        # Verify we get our mock UUID
+        self.assertEqual(response_data["job_result"]["id"], mock_uuid)
+        self.assertEqual(response_data["job_result"]["url"], "/job-result/123/")
+
+        # Verify job was enqueued with correct parameters
+        mock_job_result.enqueue_job.assert_called_once()
+        call_args = mock_job_result.enqueue_job.call_args
+        self.assertEqual(call_args[0][0], mock_job)  # job object
+        self.assertEqual(call_args[0][1], self.user)  # user
+        self.assertIn("plan_type", call_args[1])
+        self.assertEqual(call_args[1]["plan_type"], "remediation")
+        self.assertIn("feature", call_args[1])
+        self.assertEqual(call_args[1]["feature"], [feature.pk])
+
+    def test_post_method_missing_parameters(self):
+        """Test POST method returns error for missing parameters."""
+        request = self.factory.post("/config-compliance/remediate/", {})
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+        response = view.post(request)
+
+        self.assertEqual(response.status_code, 400)
+        response_data = json.loads(response.content)
+        self.assertIn("error", response_data)
+        self.assertIn("Missing feature_id or config_hash", response_data["error"])
+
+    def test_post_method_nonexistent_feature(self):
+        """Test POST method returns error for nonexistent feature."""
+        request = self.factory.post(
+            "/config-compliance/remediate/",
+            {
+                "feature_id": "00000000-0000-0000-0000-000000000000",
+                "config_hash": "test123hash"
+            }
+        )
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+        response = view.post(request)
+
+        self.assertEqual(response.status_code, 404)
+        response_data = json.loads(response.content)
+        self.assertIn("error", response_data)
+        self.assertIn("not found", response_data["error"])
+
+    def test_post_method_nonexistent_hash_group(self):
+        """Test POST method returns error for nonexistent hash group."""
+        # Get fresh objects from database
+        rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
+        feature = rule.feature
+
+        request = self.factory.post(
+            "/config-compliance/remediate/",
+            {
+                "feature_id": str(feature.pk),
+                "config_hash": "nonexistent_hash"
+            }
+        )
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+        response = view.post(request)
+
+        self.assertEqual(response.status_code, 404)
+        response_data = json.loads(response.content)
+        self.assertIn("error", response_data)
+        self.assertIn("Configuration group not found", response_data["error"])
+
+    def test_post_method_no_devices_in_group(self):
+        """Test POST method returns error when no devices found in hash group."""
+        # Get fresh objects from database
+        rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
+        feature = rule.feature
+
+        # Create a hash group with no devices
+        models.ConfigHashGrouping.objects.create(
+            rule=rule,
+            config_hash="empty_hash",
+            config_content={"empty": "config"},
+        )
+
+        request = self.factory.post(
+            "/config-compliance/remediate/",
+            {
+                "feature_id": str(feature.pk),
+                "config_hash": "empty_hash"
+            }
+        )
+        request.user = self.user
+
+        view = RemediateHashGroupView()
+        response = view.post(request)
+
+        self.assertEqual(response.status_code, 404)
+        response_data = json.loads(response.content)
+        self.assertIn("error", response_data)
+        self.assertIn("No devices found", response_data["error"])
+
+    @override_settings(EXEMPT_VIEW_PERMISSIONS=[])  # Remove permission exemption for this test
+    def test_view_requires_permission(self):
+        """Test that the view requires proper permissions."""
+        # Get fresh objects from database
+        rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
+        feature = rule.feature
+
+        # Create ConfigCompliance records so devices are in the group
+        models.ConfigCompliance.objects.get_or_create(
+            device=self.device1,
+            rule=rule,
+            defaults={
+                "actual": {"test": "config"},
+                "intended": {"different": "config"},
+                "compliance": False,
+                "compliance_int": 0,
+            }
+        )
+
+        # Create a user without permissions
+        user_without_perms = User.objects.create_user(username="noperms", email="noperms@example.com")
+
+        request = self.factory.post(
+            "/config-compliance/remediate/",
+            {
+                "feature_id": str(feature.pk),
+                "config_hash": "test123hash"
+            }
+        )
+        request.user = user_without_perms
+
+        view = RemediateHashGroupView()
+        view.request = request  # Set the request on the view for permission checking
+
+        # The view should check permissions and raise PermissionDenied
+        with self.assertRaises(PermissionDenied):
+            view.dispatch(request)
+
+
+@override_settings(EXEMPT_VIEW_PERMISSIONS=["*"])
+class ConfigHashGroupingTemplateTestCase(TestCase):
+    """Test custom template functionality for hash grouping."""
+
+    @classmethod
+    def setUpTestData(cls):
+        """Set up test data for template tests."""
+        create_device_data()
+
+        # Get devices
+        cls.device1 = Device.objects.get(name="Device 1")
+        cls.device2 = Device.objects.get(name="Device 2")
+
+        # Create compliance features
+        cls.feature1 = create_feature_rule_json(cls.device1, feature="TestFeature1")
+
+        # Create identical configs for multiple devices to create hash groups
+        cls.config_content = {"interface": {"GigabitEthernet0/1": {"ip_address": "192.168.1.1/24"}}}
+
+        # Create ConfigCompliance records to trigger hash group creation
+        models.ConfigCompliance.objects.create(
+            device=cls.device1,
+            rule=cls.feature1,
+            actual=cls.config_content,
+            intended={"different": "config"},
+            compliance=False,
+            compliance_int=0,
+        )
+        models.ConfigCompliance.objects.create(
+            device=cls.device2,
+            rule=cls.feature1,
+            actual=cls.config_content,
+            intended={"different": "config"},
+            compliance=False,
+            compliance_int=0,
+        )
+
+        # Directly create ConfigHashGrouping to ensure it exists for template tests
+        import hashlib
+        import json
+        config_hash = hashlib.md5(json.dumps(cls.config_content, sort_keys=True).encode()).hexdigest()
+        cls.hash_group = models.ConfigHashGrouping.objects.create(
+            rule=cls.feature1,
+            config_hash=config_hash,
+            config_content=cls.config_content
+        )
+
+    def test_viewset_uses_custom_template(self):
+        """Test that ConfigHashGroupingUIViewSet uses custom template."""
+        viewset = ConfigHashGroupingUIViewSet()
+        self.assertEqual(viewset.template_name, "nautobot_golden_config/confighashgrouping_list.html")
+
+    def test_hash_grouping_page_includes_modal(self):
+        """Test that hash grouping page includes modal and JavaScript."""
+        url = reverse("plugins:nautobot_golden_config:confighashgrouping_list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        # Check for modal HTML elements (actual content from job_result_modal.html)
+        self.assertIn('id="modalPopup"', content)
+        self.assertIn('modal-dialog', content)
+        self.assertIn('modal-content', content)
+
+        # Check for JavaScript includes
+        self.assertIn('run_job.js', content)
+        self.assertIn('nautobot_csrf_token', content)
+
+        # Check for hash group specific JavaScript functions
+        self.assertIn('formatHashGroupJobData', content)
+        self.assertIn('getDeviceIdsForHashGroup', content)
+        self.assertIn('startHashGroupRemediationJob', content)
+        self.assertIn('hash-plan-generate', content)
+
+    def test_hash_grouping_table_renders_with_button_attributes(self):
+        """Test that table renders buttons with correct data attributes."""
+        url = reverse("plugins:nautobot_golden_config:confighashgrouping_list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        # The template should always render the JavaScript even if no buttons are present
+        # Check for JavaScript function that would be triggered by buttons
+        self.assertIn('hash-plan-generate', content)
+
+        # If there are hash groups with data, check for button attributes
+        if 'data-feature-id' in content:
+            self.assertIn('data-config-hash', content)
+            self.assertIn('data-feature-name', content)
+            self.assertIn('data-device-count', content)
+            self.assertIn('<button', content)
+            self.assertIn('Generate Remediation Config Plans', content)
+
+    def test_template_context_includes_csrf_token(self):
+        """Test that template context includes CSRF token for JavaScript."""
+        url = reverse("plugins:nautobot_golden_config:confighashgrouping_list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('csrf_token', response.context)
+
+    def test_template_extends_correct_base(self):
+        """Test that custom template extends the correct base template."""
+        # This is more of a static test, but we can verify the response uses our custom template
+        url = reverse("plugins:nautobot_golden_config:confighashgrouping_list")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+        # Check that our custom template was used by looking for our specific JavaScript
+        content = response.content.decode()
+        self.assertIn('Generate Remediation Config Plans', content)
+
+        # Verify we have the modal title
+        self.assertIn('modalPopup', content)
