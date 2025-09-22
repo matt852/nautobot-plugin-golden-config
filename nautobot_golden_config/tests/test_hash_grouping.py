@@ -599,22 +599,10 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
         all_hash_records_before = models.ConfigComplianceHash.objects.filter(rule=self.feature1)
         self.assertEqual(all_hash_records_before.count(), 8)  # 4 actual + 4 intended
 
-        # Debug: Check which records have config_group set
-        actual_with_group = models.ConfigComplianceHash.objects.filter(
-            rule=self.feature1, config_type="actual", config_group__isnull=False
-        ).count()
-        intended_with_group = models.ConfigComplianceHash.objects.filter(
-            rule=self.feature1, config_type="intended", config_group__isnull=False
-        ).count()
-        print(f"Actual records with config_group: {actual_with_group}")
-        print(f"Intended records with config_group: {intended_with_group}")
 
         # Get the hash group IDs to delete
         group_pks = list(hash_groups.values_list("pk", flat=True))
 
-        # Debug: Check ConfigCompliance records before deletion
-        compliance_before = models.ConfigCompliance.objects.filter(rule=self.feature1).count()
-        print(f"ConfigCompliance records before deletion: {compliance_before}")
 
         # Create confirmation request using factory
         request = self.factory.post(
@@ -646,14 +634,10 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
 
         # Verify related hash records were also deleted
         remaining_hash_records = models.ConfigComplianceHash.objects.filter(rule=self.feature1)
-        print(f"Remaining hash records after deletion: {remaining_hash_records.count()}")
-
-        # Debug: Check what type of records remain
         remaining_actual = models.ConfigComplianceHash.objects.filter(rule=self.feature1, config_type="actual").count()
         remaining_intended = models.ConfigComplianceHash.objects.filter(
             rule=self.feature1, config_type="intended"
         ).count()
-        print(f"Remaining actual: {remaining_actual}, intended: {remaining_intended}")
 
         # The current implementation has a bug - it doesn't delete intended records
         # that don't have config_group set. This test documents the current behavior
@@ -664,11 +648,6 @@ class ConfigHashGroupingIntegrationTestCase(TestCase):
 
         # Verify ConfigCompliance records still exist (should not be affected)
         remaining_compliance_records = models.ConfigCompliance.objects.filter(rule=self.feature1)
-        print(f"Remaining ConfigCompliance records: {remaining_compliance_records.count()}")
-
-        # Debug: Check all ConfigCompliance records in the test
-        all_compliance = models.ConfigCompliance.objects.all()
-        print(f"All ConfigCompliance records in test: {all_compliance.count()}")
 
         # For now, let's adjust the assertion to match the actual behavior
         # This suggests there might be some cleanup happening we're not aware of
@@ -748,10 +727,8 @@ class RemediateHashGroupViewTestCase(TestCase):
     @patch("nautobot_golden_config.views.redirect")
     def test_get_method_legacy_behavior(self, mock_redirect, mock_messages):
         """Test that GET method maintains legacy redirect behavior."""
-        # Get fresh objects from database
         rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
         feature = rule.feature
-        # Get the actual hash from the database (not from self.hash_group which may be stale)
         actual_hash_group = models.ConfigHashGrouping.objects.filter(rule=rule).first()
         actual_hash = actual_hash_group.config_hash if actual_hash_group else "test123hash"
 
@@ -780,10 +757,8 @@ class RemediateHashGroupViewTestCase(TestCase):
 
     def test_post_method_get_devices_only(self):
         """Test POST method with get_devices_only flag returns device IDs."""
-        # Get fresh objects from database
         rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
         feature = rule.feature
-        # Get the actual hash from the database (not from self.hash_group which may be stale)
         actual_hash_group = models.ConfigHashGrouping.objects.filter(rule=rule).first()
         actual_hash = actual_hash_group.config_hash if actual_hash_group else "test123hash"
 
@@ -803,7 +778,6 @@ class RemediateHashGroupViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         response_data = json.loads(response.content)
         self.assertIn("device_ids", response_data)
-        # Check that we get the expected devices (may be 1 or 2 depending on test data)
         expected_devices = list(models.ConfigComplianceHash.objects.filter(
             rule=rule,
             config_type="actual",
@@ -814,17 +788,14 @@ class RemediateHashGroupViewTestCase(TestCase):
 
         self.assertEqual(len(response_data["device_ids"]), len(expected_devices))
         for device_id in expected_devices:
-            # Convert UUID to string for comparison
             self.assertIn(str(device_id), response_data["device_ids"])
 
     @patch('nautobot.extras.models.JobResult')
     @patch('nautobot.extras.models.Job')
     def test_post_method_starts_job(self, mock_job_class, mock_job_result):
         """Test POST method starts job and returns job result data."""
-        # Get fresh objects from database
         rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
         feature = rule.feature
-        # Get the actual hash from the database (not from self.hash_group which may be stale)
         actual_hash_group = models.ConfigHashGrouping.objects.filter(rule=rule).first()
         actual_hash = actual_hash_group.config_hash if actual_hash_group else "test123hash"
 
@@ -832,7 +803,6 @@ class RemediateHashGroupViewTestCase(TestCase):
         mock_job_class.objects.get.return_value = mock_job
 
         mock_job_result_obj = MagicMock()
-        # Use a proper UUID format for the mock
         mock_uuid = "12345678-1234-5678-9abc-123456789012"
         mock_job_result_obj.pk = mock_uuid
         mock_job_result_obj.id = mock_uuid
@@ -856,7 +826,6 @@ class RemediateHashGroupViewTestCase(TestCase):
         self.assertIn("job_result", response_data)
         self.assertIn("id", response_data["job_result"])
         self.assertIn("url", response_data["job_result"])
-        # Verify we get our mock UUID
         self.assertEqual(response_data["job_result"]["id"], mock_uuid)
         self.assertEqual(response_data["job_result"]["url"], "/job-result/123/")
 
@@ -904,7 +873,6 @@ class RemediateHashGroupViewTestCase(TestCase):
 
     def test_post_method_nonexistent_hash_group(self):
         """Test POST method returns error for nonexistent hash group."""
-        # Get fresh objects from database
         rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
         feature = rule.feature
 
@@ -927,7 +895,6 @@ class RemediateHashGroupViewTestCase(TestCase):
 
     def test_post_method_no_devices_in_group(self):
         """Test POST method returns error when no devices found in hash group."""
-        # Get fresh objects from database
         rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
         feature = rule.feature
 
@@ -958,7 +925,6 @@ class RemediateHashGroupViewTestCase(TestCase):
     @override_settings(EXEMPT_VIEW_PERMISSIONS=[])  # Remove permission exemption for this test
     def test_view_requires_permission(self):
         """Test that the view requires proper permissions."""
-        # Get fresh objects from database
         rule = models.ComplianceRule.objects.get(feature__name="TestFeature1")
         feature = rule.feature
 
