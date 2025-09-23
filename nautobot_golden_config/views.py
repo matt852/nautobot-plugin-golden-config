@@ -10,8 +10,6 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import CharField, Count, Exists, ExpressionWrapper, F, FloatField, Max, OuterRef, Q, Value
 from django.db.models.functions import Cast, Concat
-
-# TODO: Remove this and figure out another way to return json responses
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse

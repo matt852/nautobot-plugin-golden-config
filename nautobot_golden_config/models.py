@@ -1011,11 +1011,10 @@ class ConfigComplianceHash(PrimaryModel):  # pylint: disable=too-many-ancestors
 
     def delete(self, *args, **kwargs):
         """Override delete to clean up orphaned ConfigHashGrouping records."""
-        rule = self.rule
         result = super().delete(*args, **kwargs)
 
         # Clean up orphaned groups for this rule after deletion
-        rule.cleanup_orphaned_hash_groups()
+        self.rule.cleanup_orphaned_hash_groups()
         return result
 
 
