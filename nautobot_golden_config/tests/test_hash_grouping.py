@@ -350,7 +350,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
         """Test that actions column contains expected remediation button with data attributes."""
         # Get the actions column template from the table class definition
         table = ConfigHashGroupingTable([])
-        actions_column = table.columns['actions']
+        actions_column = table.columns["actions"]
         template_code = actions_column.column.template_code
 
         # Check for button instead of link
@@ -369,7 +369,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
         """Test device count column template for filtering links."""
         # Get the device_count column template from the table class definition
         table = ConfigHashGroupingTable([])
-        device_count_column = table.columns['device_count']
+        device_count_column = table.columns["device_count"]
         template_code = device_count_column.column.template_code
 
         # Check for filtering URL with parameters
@@ -381,7 +381,7 @@ class ConfigHashGroupingTableTestCase(TestCase):
         """Test config content column template structure."""
         # Get the config_content column template from the table class definition
         table = ConfigHashGroupingTable([])
-        config_content_column = table.columns['config_content']
+        config_content_column = table.columns["config_content"]
         template_code = config_content_column.column.template_code
 
         # Check for clipboard functionality in the display template
