@@ -8,8 +8,7 @@ import yaml
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import CharField, Count, Exists, ExpressionWrapper, F, FloatField, Max, OuterRef, Q, Value
-from django.db.models.functions import Cast, Concat
+from django.db.models import Count, Exists, ExpressionWrapper, F, FloatField, Max, OuterRef, Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -720,21 +719,13 @@ class ConfigComplianceHashUIViewSet(views.NautobotUIViewSet):
         for hash_record in selected_hashes:
             device_rule_combinations.add((hash_record.device_id, hash_record.rule_id))
 
-        # Delete both actual and intended hashes for the same device/rule combinations using bulk delete
-        device_rule_identifiers = [f"{device_id}-{rule_id}" for device_id, rule_id in device_rule_combinations]
+        # Delete both actual and intended hashes for the same device/rule combinations
+        # Use Q objects to filter by device/rule combinations more reliably
+        q_objects = Q()
+        for device_id, rule_id in device_rule_combinations:
+            q_objects |= Q(device_id=device_id, rule_id=rule_id)
 
-        # Perform single bulk delete operation using concatenated field matching
-        deleted_count, _ = (
-            models.ConfigComplianceHash.objects.annotate(
-                device_rule_key=Concat(
-                    Cast("device_id", output_field=CharField()),
-                    Value("-"),
-                    Cast("rule_id", output_field=CharField()),
-                )
-            )
-            .filter(device_rule_key__in=device_rule_identifiers)
-            .delete()
-        )
+        deleted_count, _ = models.ConfigComplianceHash.objects.filter(q_objects).delete()
 
         messages.success(
             request,
