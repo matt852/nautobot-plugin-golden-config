@@ -18,6 +18,41 @@ from nautobot.extras.models.statuses import Status
 
 from nautobot_golden_config.models import ComplianceFeature, ComplianceRule, GoldenConfigSetting, RemediationSetting
 
+VENDOR_CONFIGS = {
+    "nokia": {
+        "manufacturer": "Nokia",
+        "platform_name": "srlinux",
+        "napalm_driver": "nokia_srl",
+        "network_driver": "nokia_srl",
+        "device_type_model": "srlinux",
+        "device_name_prefix": "srl",
+        "features": {"DNS": "dns", "NTP": "ntp", "SNMP": "snmp"},
+        "remediation_type": "hierconfig",
+        "interfaces": [
+            {"name": "ethernet-1/1", "type": "100base-tx"},
+            {"name": "ethernet-1/2", "type": "100base-tx"},
+            {"name": "lo0", "type": "virtual"},
+            {"name": "mgmt0", "type": "100base-tx", "mgmt_only": True},
+        ],
+    },
+    "arista": {
+        "manufacturer": "Arista",
+        "platform_name": "ceos",
+        "napalm_driver": "eos",
+        "network_driver": "arista_eos",
+        "device_type_model": "ceos",
+        "device_name_prefix": "ceos",
+        "features": {"DNS": "dns", "NTP": "ntp server", "SNMP": "snmp-server"},
+        "remediation_type": "hierconfig",
+        "interfaces": [
+            {"name": "Ethernet1", "type": "100base-tx"},
+            {"name": "Ethernet2", "type": "100base-tx"},
+            {"name": "Loopback0", "type": "virtual"},
+            {"name": "Management1", "type": "100base-tx", "mgmt_only": True},
+        ],
+    },
+}
+
 
 class Command(BaseCommand):
     """Populate the database with default static data to use in a local dev enviroment."""
@@ -27,18 +62,13 @@ class Command(BaseCommand):
     def __init__(self, *args, **kwargs):
         """Initialize the command."""
         super().__init__(*args, **kwargs)
-        self.features: Dict[str, str] = {"DNS": "dns", "NTP": "ntp server", "SNMP": "snmp-server"}
+        self.features: Dict[str, str] = {}
         self.git_url: str = os.getenv("GIT_URL", "http://git-server:3000/gclab")
-        self.device_name_prefix: str = os.getenv("DEVICE_NAME_PREFIX", "ceos")
+        self.device_name_prefix: str = ""
         self.devices: List[str] = []
         self.device_count: int = 4  # Default to creating 4 devices
-
-        self.interfaces = [
-            {"name": "Ethernet1", "type": "100base-tx"},
-            {"name": "Ethernet2", "type": "100base-tx"},
-            {"name": "Loopback0", "type": "virtual"},
-            {"name": "Management1", "type": "100base-tx", "mgmt_only": True},
-        ]
+        self.interfaces: list = []
+        self.vendor_config: dict = {}
 
     def add_arguments(self, parser):  # noqa: D102
         parser.add_argument(
@@ -50,6 +80,12 @@ class Command(BaseCommand):
             "--device-count",
             default=1,
             help="Define how many lab devices to create.",
+        )
+        parser.add_argument(
+            "--vendor",
+            default="nokia",
+            choices=list(VENDOR_CONFIGS.keys()),
+            help='Vendor platform to provision. Defaults to "nokia".',
         )
 
     def _deploy_local_lab(self, db: str):
@@ -88,7 +124,7 @@ class Command(BaseCommand):
 
         # --- 3. Manufacturer --- #
         try:
-            mfg_obj, _ = Manufacturer.objects.using(db).get_or_create(name="Arista")
+            mfg_obj, _ = Manufacturer.objects.using(db).get_or_create(name=self.vendor_config["manufacturer"])
             self.stdout.write(self.style.SUCCESS(f"Manufacturer {mfg_obj} created"))
         except Exception as e:
             self.stderr.write(str(e))
@@ -96,9 +132,14 @@ class Command(BaseCommand):
 
         # --- 4. Platform --- #
         try:
-            platform_obj, _ = Platform.objects.using(db).get_or_create(
-                name="ceos", manufacturer=mfg_obj, napalm_driver="eos", network_driver="arista_eos"
-            )
+            platform_kwargs = {
+                "name": self.vendor_config["platform_name"],
+                "manufacturer": mfg_obj,
+                "network_driver": self.vendor_config["network_driver"],
+            }
+            if self.vendor_config["napalm_driver"]:
+                platform_kwargs["napalm_driver"] = self.vendor_config["napalm_driver"]
+            platform_obj, _ = Platform.objects.using(db).get_or_create(**platform_kwargs)
             self.stdout.write(self.style.SUCCESS(f"Platform {platform_obj} created"))
         except Exception as e:
             self.stderr.write(str(e))
@@ -106,7 +147,7 @@ class Command(BaseCommand):
 
         # --- 5. Device Type and Interfaces --- #
         try:
-            device_type_obj, _ = DeviceType.objects.using(db).get_or_create(model="ceos", manufacturer=mfg_obj)
+            device_type_obj, _ = DeviceType.objects.using(db).get_or_create(model=self.vendor_config["device_type_model"], manufacturer=mfg_obj)
             for interface in self.interfaces:
                 try:
                     device_type_obj.interface_templates.create(
@@ -160,7 +201,7 @@ class Command(BaseCommand):
         # --- 8. Remediation Setting --- #
         try:
             gc_remediation_obj, _ = RemediationSetting.objects.using(db).get_or_create(
-                platform=platform_obj, remediation_type="hierconfig"
+                platform=platform_obj, remediation_type=self.vendor_config["remediation_type"]
             )
             self.stdout.write(self.style.SUCCESS(f"Remediation Setting {gc_remediation_obj} created"))
         except Exception as e:
@@ -229,7 +270,7 @@ class Command(BaseCommand):
                 name="GoldenConfigSetting Lab Settings scope",
                 group_type="dynamic-filter",
                 content_type_id=ct_device_obj.id,
-                filter={"platform": ["ceos"]},
+                filter={"platform": [self.vendor_config["platform_name"]]},
             )
             self.stdout.write(self.style.SUCCESS(f"Dynamic Group {dynamic_group_obj} created"))
         except Exception as e:
@@ -238,7 +279,7 @@ class Command(BaseCommand):
 
         # --- 14. Update Golden Config settings --- #
         try:
-            GoldenConfigSetting.objects.using(db).create(
+            GoldenConfigSetting.objects.using(db).get_or_create(
                 name="Lab Settings",
                 slug="lab-settings",
                 weight=2000,
@@ -259,6 +300,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """Entry point to the management command."""
         self.stdout.write(f"options: {options}")
+
+        # Apply vendor config
+        vendor = options["vendor"]
+        self.vendor_config = VENDOR_CONFIGS[vendor]
+        self.features = self.vendor_config["features"]
+        self.interfaces = self.vendor_config["interfaces"]
+        self.device_name_prefix = os.getenv("DEVICE_NAME_PREFIX", self.vendor_config["device_name_prefix"])
+
         if options["device_count"]:
             try:
                 if int(options["device_count"]) < 1:
@@ -268,7 +317,7 @@ class Command(BaseCommand):
                 return
             self.device_count = int(options["device_count"])
 
-        self.stdout.write(f"This command will create {options['device_count']} devices in Nautobot.")
+        self.stdout.write(f"This command will create {options['device_count']} {vendor} devices in Nautobot.")
         self.devices = [f"{self.device_name_prefix}{i+1}" for i in range(int(options["device_count"]))]
 
         self._deploy_local_lab(db=options["database"])

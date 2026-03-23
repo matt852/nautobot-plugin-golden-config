@@ -12,4 +12,5 @@ nautobot_golden_config:
   #   - "docker-compose.postgres.yml"
   #   - "docker-compose.dev.yml"
   #   - "docker-compose.arista.dev.yml"
+  #   - "docker-compose.nokia.dev.yml"
   #   - "docker-compose.git.dev.yml"

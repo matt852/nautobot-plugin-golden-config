@@ -127,6 +127,7 @@ PLUGINS = ["nautobot_plugin_nornir", "nautobot_golden_config"]
 PLUGINS_CONFIG = {
     "nautobot_plugin_nornir": {
         "nornir_settings": {
+            # "default_framework": {"nokia_srl": "netmiko"},
             "credentials": "nautobot_plugin_nornir.plugins.credentials.env_vars.CredentialsEnvVars",
             "runner": {
                 "plugin": "threaded",
@@ -167,6 +168,12 @@ PLUGINS_CONFIG = {
         #     "arbitrary_platform_name": "my_custom.dispatcher.OtherNornirDriver",
         # },
     },
+}
+
+NETWORK_DRIVERS = {
+    "netmiko": {"nokia_srl": "nokia_srl"},
+    "netutils": {"nokia_srl": "nokia_srl"},
+    "pyats": {"nokia_srl": "nokia_srl"},
 }
 
 # TODO:Verify this is still needed

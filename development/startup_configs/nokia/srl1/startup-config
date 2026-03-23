@@ -1,0 +1,69 @@
+{
+    "system": {
+        "name": {
+            "host-name": "srl1"
+        },
+        "dns": {
+            "network-instance": "default",
+            "search-list": [
+                "networktocode.com"
+            ]
+        },
+        "ntp": {
+            "server": [
+                {
+                    "address": "10.2.2.2",
+                    "prefer": true
+                }
+            ]
+        },
+        "aaa": {
+            "authentication": {
+                "user": [
+                    {
+                        "username": "lab",
+                        "password": "labpass",
+                        "role": "admin"
+                    }
+                ]
+            }
+        },
+        "snmp": {
+            "community": [
+                {
+                    "name": "labpass",
+                    "permission": "r"
+                },
+                {
+                    "name": "labsecure",
+                    "permission": "rw"
+                }
+            ],
+            "network-instance": "default",
+            "trap-group": [
+                {
+                    "name": "lab",
+                    "target": [
+                        {
+                            "address": "10.1.1.1",
+                            "version": "v2c"
+                        }
+                    ]
+                }
+            ]
+        },
+        "ssh-server": {
+            "network-instance": "default",
+            "port": 22
+        },
+        "json-rpc-server": {
+            "network-instance": "default",
+            "http": {
+                "admin-state": "enable"
+            },
+            "https": {
+                "admin-state": "enable"
+            }
+        }
+    }
+}

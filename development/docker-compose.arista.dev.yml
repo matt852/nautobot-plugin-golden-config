@@ -26,25 +26,25 @@ services:
     container_name: "ceos1"
     hostname: "ceos1"
     volumes:
-      - "./startup_configs/ceos1/startup-config:/mnt/flash/startup-config"
+      - "./startup_configs/arista/ceos1/startup-config:/mnt/flash/startup-config"
 
   ceos2:
     <<: *ceos-common
     container_name: "ceos2"
     hostname: "ceos2"
     volumes:
-      - "./startup_configs/ceos2/startup-config:/mnt/flash/startup-config"
+      - "./startup_configs/arista/ceos2/startup-config:/mnt/flash/startup-config"
 
   # ceos3:
   #   <<: *ceos-common
   #   container_name: "ceos3"
   #   hostname: "ceos3"
   #   volumes:
-  #     - "./startup_configs/ceos3/startup-config:/mnt/flash/startup-config"
+  #     - "./startup_configs/arista/ceos3/startup-config:/mnt/flash/startup-config"
 
   # ceos4:
   #   <<: *ceos-common
   #   container_name: "ceos4"
   #   hostname: "ceos4"
   #   volumes:
-  #     - "./startup_configs/ceos4/startup-config:/mnt/flash/startup-config"
+  #     - "./startup_configs/arista/ceos4/startup-config:/mnt/flash/startup-config"

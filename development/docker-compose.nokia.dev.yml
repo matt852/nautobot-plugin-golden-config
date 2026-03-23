@@ -1,0 +1,37 @@
+---
+x-srlinux-common: &srlinux-common
+  image: "ghcr.io/nokia/srlinux:latest"
+  privileged: true
+  tty: true
+  stdin_open: true
+  environment:
+    SRLINUX: "1"
+
+services:
+  srl1:
+    <<: *srlinux-common
+    container_name: "srl1"
+    hostname: "srl1"
+    volumes:
+      - "./startup_configs/nokia/srl1/startup-config:/etc/opt/srlinux/config.json:ro"
+
+  srl2:
+    <<: *srlinux-common
+    container_name: "srl2"
+    hostname: "srl2"
+    volumes:
+      - "./startup_configs/nokia/srl2/startup-config:/etc/opt/srlinux/config.json:ro"
+
+  # srl3:
+  #   <<: *srlinux-common
+  #   container_name: "srl3"
+  #   hostname: "srl3"
+  #   volumes:
+  #     - "./startup_configs/nokia/srl3/startup-config:/etc/opt/srlinux/config.json:ro"
+
+  # srl4:
+  #   <<: *srlinux-common
+  #   container_name: "srl4"
+  #   hostname: "srl4"
+  #   volumes:
+  #     - "./startup_configs/nokia/srl4/startup-config:/etc/opt/srlinux/config.json:ro"
